@@ -40,8 +40,8 @@ export async function searchPredictHQ(params: EventSearchParams, token?: string)
   }
   if (params.fromISO) url.searchParams.set('start.gte', new Date(params.fromISO).toISOString());
   if (params.toISO) url.searchParams.set('start.lte', new Date(params.toISO).toISOString());
-  url.searchParams.set('limit', String(Math.min(100, params.size ?? 20)));
-  if (params.page && params.page > 1) url.searchParams.set('offset', String(((params.page - 1) * (params.size ?? 20))));
+  url.searchParams.set('limit', String(Math.min(100, params.size ?? 10)));
+  if (params.page && params.page > 1) url.searchParams.set('offset', String(((params.page - 1) * (params.size ?? 10))));
 
   try {
     const res = await fetch(url.toString(), {

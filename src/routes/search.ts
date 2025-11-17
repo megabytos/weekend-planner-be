@@ -228,7 +228,7 @@ export default async function searchRoutes(app: FastifyInstance) {
                 warnings.push('Location (lat/lon) is recommended for event search.');
             }
 
-            const size = query.pageSize;
+            const size = query.pageSize/2;
             const page = query.page;
 
             const tasks: Promise<void>[] = [];
