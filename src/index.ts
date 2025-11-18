@@ -14,6 +14,7 @@ import { z } from 'zod';
 
 import prismaPlugin from './plugins/prisma.js';
 import redisPlugin from './plugins/redis.js';
+import jwtPlugin from './plugins/jwt.js';
 import registerRoutes from './routes/index.js';
 
 const app = Fastify({ logger: true }).withTypeProvider<ZodTypeProvider>();
@@ -35,6 +36,7 @@ await app.register(swaggerUi, { routePrefix: '/docs' });
 
 await app.register(prismaPlugin);
 await app.register(redisPlugin);
+await app.register(jwtPlugin);
 
 // Health route
 app.get('/health', {
