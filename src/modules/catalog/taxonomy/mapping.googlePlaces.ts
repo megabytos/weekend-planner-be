@@ -1,4 +1,4 @@
-import type { PlaceCategorySlug } from './categories.places';
+import type { PlaceCategorySlug } from './categories.places.js';
 
 export type GooglePlaceType = string; // e.g. "restaurant", "cafe", "park"
 

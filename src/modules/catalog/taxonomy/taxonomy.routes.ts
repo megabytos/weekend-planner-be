@@ -1,9 +1,9 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { TaxonomyService } from './taxonomy.service';
+import { TaxonomyService } from './taxonomy.service.js';
 import {
     taxonomyCategoriesQuerySchema,
     taxonomyCategoriesResponseSchema
-} from './taxonomy.schemas';
+} from './taxonomy.schemas.js';
 
 export const taxonomyRoutes: FastifyPluginAsync = async (app) => {
     const service = new TaxonomyService();

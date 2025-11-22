@@ -1,11 +1,11 @@
 import type { FastifyPluginAsync } from 'fastify';
-import { GeoService } from './geo.service';
+import { GeoService } from './geo.service.js';
 import {
     geoCitiesQuerySchema,
     geoCitiesResponseSchema,
     geoCityParamsSchema,
     geoCitySchema
-} from './geo.schemas';
+} from './geo.schemas.js';
 
 export const geoRoutes: FastifyPluginAsync = async (app) => {
     const service = new GeoService();

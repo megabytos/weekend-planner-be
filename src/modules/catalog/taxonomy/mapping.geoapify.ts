@@ -1,4 +1,4 @@
-import type { PlaceCategorySlug } from './categories.places';
+import type { PlaceCategorySlug } from './categories.places.js';
 
 // Geoapify categories look like "catering.restaurant", "entertainment.cinema", etc.
 export type GeoapifyCategory = string;

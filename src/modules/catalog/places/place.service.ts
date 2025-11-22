@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
-import type { CreatePlaceInput } from './place.schemas';
+import type { CreatePlaceInput } from './place.schemas.js';
 
 export async function listPlaces() {
     return { items: [] };

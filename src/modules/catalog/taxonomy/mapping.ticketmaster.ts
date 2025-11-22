@@ -1,4 +1,4 @@
-import type { EventCategorySlug } from './categories.events';
+import type { EventCategorySlug } from './categories.events.js';
 
 export type TicketmasterSegmentName =
     | 'Music'

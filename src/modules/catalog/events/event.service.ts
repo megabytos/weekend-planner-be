@@ -1,5 +1,5 @@
 import type { PrismaClient } from '@prisma/client';
-import type { CreateEventInput } from './event.schemas';
+import type { CreateEventInput } from './event.schemas.js';
 
 export async function listEvents() {
     return { items: [] };

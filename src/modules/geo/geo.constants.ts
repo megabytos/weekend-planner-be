@@ -1,4 +1,4 @@
-import type { GeoCity } from './geo.types';
+import type { GeoCity } from './geo.types.js';
 
 export const GEO_CITIES: GeoCity[] = [
     {

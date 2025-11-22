@@ -9,8 +9,8 @@ export type TaxonomyCategory = {
 };
 
 // Import category lists (only type imports to avoid runtime cycles)
-import { EVENT_CATEGORIES as EVENT_INTERNAL } from './categories.events';
-import { PLACE_CATEGORIES as PLACE_INTERNAL } from './categories.places';
+import { EVENT_CATEGORIES as EVENT_INTERNAL } from './categories.events.js';
+import { PLACE_CATEGORIES as PLACE_INTERNAL } from './categories.places.js';
 
 // Re-export for compatibility if someone imports them from here
 export const EVENT_CATEGORIES = EVENT_INTERNAL;

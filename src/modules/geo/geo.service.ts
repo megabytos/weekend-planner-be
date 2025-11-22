@@ -1,5 +1,5 @@
-import { GEO_CITIES } from './geo.constants';
-import type { GeoCity } from './geo.types';
+import { GEO_CITIES } from './geo.constants.js';
+import type { GeoCity } from './geo.types.js';
 
 export class GeoService {
     listCities(params?: { q?: string; countryCode?: string }): GeoCity[] {

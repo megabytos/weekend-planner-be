@@ -1,4 +1,4 @@
-import type { EventCategorySlug } from './categories.events';
+import type { EventCategorySlug } from './categories.events.js';
 
 // https://docs.predicthq.com/getting-started/predicthq-data/event-categories
 export type PredictHQCategory =

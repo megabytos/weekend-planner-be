@@ -1,4 +1,4 @@
-import type { TaxonomyCategory } from './taxonomy.constants';
+import type { TaxonomyCategory } from './taxonomy.constants.js';
 
 export type PlaceCategorySlug =
     | 'place.food_restaurant'

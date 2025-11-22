@@ -4,7 +4,7 @@ import {
     PLACE_CATEGORIES,
     type TaxonomyCategory,
     type TaxonomyCategoryType
-} from './taxonomy.constants';
+} from './taxonomy.constants.js';
 
 export class TaxonomyService {
     listCategories(params?: {

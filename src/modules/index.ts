@@ -16,7 +16,7 @@ import usersRoutes from './users/user.routes.js';
 import groupsRoutes from './groups/groups.routes.js';
 import reviewsRoutes from './reviews/reviews.routes.js';
 import authRoutes from './auth/auth.routes.js';
-import { geoRoutes } from './geo/geo.routes';
+import { geoRoutes } from './geo/geo.routes.js';
 
 // Registers all domain modules and their route prefixes
 export default async function registerModules(app: FastifyInstance) {
