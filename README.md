@@ -6,8 +6,10 @@ What is included
 - TypeScript Fastify server with CORS, rate limit, Swagger (OpenAPI) and Swagger-UI at /docs.
 - Health endpoints: /health, /version and /api/system/ping.
 - Plugins: Prisma, Redis.
-- Search module skeleton with Zod request/response schemas and POST /api/search returning empty items.
-- /api/search integrates external event sources (Ticketmaster, PredictHQ) when API keys are provided.
+- Unified search module with Zod request/response schemas and POST /api/search integrating external sources.
+- External providers:
+  - Events: Ticketmaster, PredictHQ
+  - Places: Geoapify, Google Places, Foursquare
 - Prisma schema with initial models and migrations.
 - .env.example with required variables.
 
@@ -17,8 +19,15 @@ Getting started
    npm install
 3. Run dev server:
    npm run dev
-4. Open docs:
+4. Open docs (Swagger UI):
    http://localhost:3000/docs
+
+Environment variables for external APIs
+- TICKETMASTER_API_KEY — Ticketmaster Discovery API key
+- PREDICTHQ_TOKEN — PredictHQ Personal Access Token
+- GEOAPIFY_API_KEY — Geoapify Places API key
+- GOOGLE_PLACES_API_KEY — Google Places Web Service API key
+- FOURSQUARE_API_KEY — Foursquare Places API key (v3)
 
 
 Migrations (PostgreSQL)

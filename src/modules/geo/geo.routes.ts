@@ -1,0 +1,57 @@
+import type { FastifyPluginAsync } from 'fastify';
+import { GeoService } from './geo.service';
+import {
+    geoCitiesQuerySchema,
+    geoCitiesResponseSchema,
+    geoCityParamsSchema,
+    geoCitySchema
+} from './geo.schemas';
+
+export const geoRoutes: FastifyPluginAsync = async (app) => {
+    const service = new GeoService();
+    app.get(
+        '/cities',
+        {
+            schema: {
+                description: 'Lists available cities for geo features',
+                tags: ['geo'],
+                querystring: geoCitiesQuerySchema,
+                response: {
+                    200: geoCitiesResponseSchema
+                }
+            }
+        },
+        async (request) => {
+            const query = geoCitiesQuerySchema.parse(request.query);
+            const items = service.listCities({
+                q: query.q,
+                countryCode: query.countryCode
+            });
+
+            return geoCitiesResponseSchema.parse({ items });
+        }
+    );
+    app.get(
+        '/cities/:id',
+        {
+            schema: {
+                description: 'Returns city by id',
+                tags: ['geo'],
+                params: geoCityParamsSchema,
+                response: {
+                    200: geoCitySchema
+                }
+            }
+        },
+        async (request, reply) => {
+            const params = geoCityParamsSchema.parse(request.params);
+            const city = service.getCityById(params.id);
+
+            if (!city) {
+                //return reply.code(404).send({ message: 'City not found' });
+            }
+
+            return geoCitySchema.parse(city);
+        }
+    );
+};

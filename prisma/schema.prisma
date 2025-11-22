@@ -1,5 +1,4 @@
 // Prisma schema for WeekendPlanner backend
-// IMPORTANT: English comments in code; communicate with maintainer in Russian.
 // This is an initial, extensible data model aligned with docs in /docs.
 
 generator client {
@@ -61,6 +60,7 @@ enum SourceType {
   GOOGLE_PLACES
   FOURSQUARE
   MANUAL
+  PARTNER
 }
 
 /// Types of ingestion/import jobs
@@ -75,16 +75,16 @@ enum ImportKind {
 // ---------
 
 model User {
-  id          String    @id @default(cuid())
-  email       String    @unique
-  name        String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  profile     Profile?
-  plans       Plan[]
-  favorites   Favorite[]
-  reviews     Review[]
+  profile   Profile?
+  plans     Plan[]
+  favorites Favorite[]
+  reviews   Review[]
 }
 
 /// User preferences used for personalization and defaults
@@ -96,13 +96,13 @@ model Profile {
   homeLng       Decimal?     @db.Decimal(10, 7)
   budget        PriceTier?
   preferredMode CompanyType?
-  tags          String[]     // interests keywords
-  preferences   Json?        // arbitrary structured prefs (ages of kids, mobility, etc.)
+  tags          String[] // interests keywords
+  preferences   Json? // arbitrary structured prefs (ages of kids, mobility, etc.)
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
-  user          User         @relation(fields: [userId], references: [id])
-  city          City?        @relation(fields: [cityId], references: [id])
+  user User  @relation(fields: [userId], references: [id])
+  city City? @relation(fields: [cityId], references: [id])
 }
 
 model GeoRegion {
@@ -112,26 +112,26 @@ model GeoRegion {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  cities    City[]
+  cities City[]
 }
 
 model City {
-  id         String     @id @default(cuid())
-  name       String
-  country    String
-  regionId   String?
-  lat        Decimal     @db.Decimal(10, 7)
-  lng        Decimal     @db.Decimal(10, 7)
-  tz         String      // IANA timezone
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id        String   @id @default(cuid())
+  name      String
+  country   String
+  regionId  String?
+  lat       Decimal  @db.Decimal(10, 7)
+  lng       Decimal  @db.Decimal(10, 7)
+  tz        String // IANA timezone
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  region     GeoRegion?  @relation(fields: [regionId], references: [id])
-  places     Place[]
-  events     Event[]
-  profiles   Profile[]
-  plans      Plan[]
-  partners   Partner[]
+  region   GeoRegion? @relation(fields: [regionId], references: [id])
+  places   Place[]
+  events   Event[]
+  profiles Profile[]
+  plans    Plan[]
+  partners Partner[]
 
   @@index([name])
 }
@@ -141,74 +141,74 @@ model City {
 // ---------
 
 model PlaceCategory {
-  id        String   @id @default(cuid())
-  key       String   @unique
+  id        String        @id @default(cuid())
+  key       String        @unique
   title     String
   parentId  String?
   scope     CategoryScope @default(PLACE)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
-  parent    PlaceCategory? @relation("PlaceCategoryToParent", fields: [parentId], references: [id])
-  children  PlaceCategory[] @relation("PlaceCategoryToParent")
-  places    PlaceToCategory[]
+  parent     PlaceCategory?    @relation("PlaceCategoryToParent", fields: [parentId], references: [id])
+  children   PlaceCategory[]   @relation("PlaceCategoryToParent")
+  places     PlaceToCategory[]
   placesMain Place[]
 }
 
 model EventCategory {
-  id        String   @id @default(cuid())
-  key       String   @unique
+  id        String        @id @default(cuid())
+  key       String        @unique
   title     String
   parentId  String?
   scope     CategoryScope @default(EVENT)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
-  parent    EventCategory? @relation("EventCategoryToParent", fields: [parentId], references: [id])
-  children  EventCategory[] @relation("EventCategoryToParent")
-  events    EventToCategory[]
+  parent     EventCategory?    @relation("EventCategoryToParent", fields: [parentId], references: [id])
+  children   EventCategory[]   @relation("EventCategoryToParent")
+  events     EventToCategory[]
   eventsMain Event[]
 }
 
 model Place {
-  id            String    @id @default(cuid())
-  cityId        String
-  name          String
-  description   String?
-  mainCategoryId String?
+  id                    String                 @id @default(cuid())
+  cityId                String
+  name                  String
+  description           String?
+  mainCategoryId        String?
   // Coordinates of the place. Decimal for accuracy
-  lat           Decimal   @db.Decimal(10, 7)
-  lng           Decimal   @db.Decimal(10, 7)
-  address       String?
-  venueType     VenueType?
-  priceTier     PriceTier?
-  openingHours  Json?      // normalized opening hours; if null -> assumed always open
-  attributes    Json?      // extra structured attributes
-  rating        Float?     // aggregated rating
-  reviewCount   Int        @default(0)
-  isActive      Boolean    @default(true)
-  moderation    ModerationStatus @default(APPROVED)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-
-  city          City       @relation(fields: [cityId], references: [id])
-  mainCategory  PlaceCategory? @relation(fields: [mainCategoryId], references: [id])
-  categories    PlaceToCategory[]
-  sources       PlaceSource[]
-  events        EventOccurrence[] // occurrences referencing this place
-  reviews       Review[]
-  favorites     Favorite[]
-  planItems     PlanItem[]
-  moderationEntries ModerationEntry[]
+  lat                   Decimal                @db.Decimal(10, 7)
+  lng                   Decimal                @db.Decimal(10, 7)
+  address               String?
+  venueType             VenueType?
+  priceTier             PriceTier?
+  openingHours          Json? // normalized opening hours; if null -> assumed always open
+  attributes            Json? // extra structured attributes
+  rating                Float? // aggregated rating
+  reviewCount           Int                    @default(0)
+  isActive              Boolean                @default(true)
+  moderation            ModerationStatus       @default(APPROVED)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  tags                  String[]
+  city                  City                   @relation(fields: [cityId], references: [id])
+  mainCategory          PlaceCategory?         @relation(fields: [mainCategoryId], references: [id])
+  categories            PlaceToCategory[]
+  sources               PlaceSource[]
+  events                EventOccurrence[] // occurrences referencing this place
+  reviews               Review[]
+  favorites             Favorite[]
+  planItems             PlanItem[]
+  moderationEntries     ModerationEntry[]
   recommendationSignals RecommendationSignal[]
-  
+
   @@index([cityId])
   @@index([lat, lng])
   @@index([mainCategoryId])
 }
 
 model Event {
-  id             String    @id @default(cuid())
+  id             String           @id @default(cuid())
   cityId         String
   title          String
   description    String?
@@ -218,45 +218,45 @@ model Event {
   attributes     Json?
   imageUrl       String?
   rating         Float?
-  reviewCount    Int        @default(0)
-  isActive       Boolean    @default(true)
+  reviewCount    Int              @default(0)
+  isActive       Boolean          @default(true)
   moderation     ModerationStatus @default(APPROVED)
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @updatedAt
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
-  city           City       @relation(fields: [cityId], references: [id])
-  mainCategory   EventCategory? @relation(fields: [mainCategoryId], references: [id])
-  categories     EventToCategory[]
-  occurrences    EventOccurrence[]
-  sources        EventSource[]
-  reviews        Review[]
-  favorites      Favorite[]
-  moderationEntries ModerationEntry[]
+  city                  City                   @relation(fields: [cityId], references: [id])
+  mainCategory          EventCategory?         @relation(fields: [mainCategoryId], references: [id])
+  categories            EventToCategory[]
+  occurrences           EventOccurrence[]
+  sources               EventSource[]
+  reviews               Review[]
+  favorites             Favorite[]
+  moderationEntries     ModerationEntry[]
   recommendationSignals RecommendationSignal[]
-  
+
   @@index([cityId])
   @@index([mainCategoryId])
 }
 
 /// One event may have multiple occurrences in time and location
 model EventOccurrence {
-  id          String   @id @default(cuid())
-  eventId     String
-  placeId     String?
+  id        String    @id @default(cuid())
+  eventId   String
+  placeId   String?
   // Either linked place or explicit coordinates
-  lat         Decimal? @db.Decimal(10, 7)
-  lng         Decimal? @db.Decimal(10, 7)
-  startTime   DateTime
-  endTime     DateTime?
-  timezone    String?
-  url         String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  lat       Decimal?  @db.Decimal(10, 7)
+  lng       Decimal?  @db.Decimal(10, 7)
+  startTime DateTime
+  endTime   DateTime?
+  timezone  String?
+  url       String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  event       Event    @relation(fields: [eventId], references: [id])
-  place       Place?   @relation(fields: [placeId], references: [id])
-  planItems   PlanItem[]
-  
+  event     Event      @relation(fields: [eventId], references: [id])
+  place     Place?     @relation(fields: [placeId], references: [id])
+  planItems PlanItem[]
+
   @@index([eventId])
   @@index([placeId])
   @@index([startTime])
@@ -264,23 +264,23 @@ model EventOccurrence {
 }
 
 model PlaceToCategory {
-  placeId     String
-  categoryId  String
-  isPrimary   Boolean @default(false)
+  placeId    String
+  categoryId String
+  isPrimary  Boolean @default(false)
 
-  place       Place         @relation(fields: [placeId], references: [id])
-  category    PlaceCategory @relation(fields: [categoryId], references: [id])
+  place    Place         @relation(fields: [placeId], references: [id])
+  category PlaceCategory @relation(fields: [categoryId], references: [id])
 
   @@id([placeId, categoryId])
 }
 
 model EventToCategory {
-  eventId     String
-  categoryId  String
-  isPrimary   Boolean @default(false)
+  eventId    String
+  categoryId String
+  isPrimary  Boolean @default(false)
 
-  event       Event         @relation(fields: [eventId], references: [id])
-  category    EventCategory @relation(fields: [categoryId], references: [id])
+  event    Event         @relation(fields: [eventId], references: [id])
+  category EventCategory @relation(fields: [categoryId], references: [id])
 
   @@id([eventId, categoryId])
 }
@@ -290,32 +290,32 @@ model EventToCategory {
 // ---------
 
 model PlaceSource {
-  id          String     @id @default(cuid())
-  placeId     String
-  source      SourceType
-  externalId  String
-  url         String?
-  payload     Json?      // raw/normalized snapshot
-  fetchedAt   DateTime?
-  createdAt   DateTime   @default(now())
+  id         String     @id @default(cuid())
+  placeId    String
+  source     SourceType
+  externalId String
+  url        String?
+  payload    Json? // raw/normalized snapshot
+  fetchedAt  DateTime?
+  createdAt  DateTime   @default(now())
 
-  place       Place      @relation(fields: [placeId], references: [id])
+  place Place @relation(fields: [placeId], references: [id])
 
   @@unique([source, externalId])
   @@index([placeId])
 }
 
 model EventSource {
-  id          String     @id @default(cuid())
-  eventId     String
-  source      SourceType
-  externalId  String
-  url         String?
-  payload     Json?
-  fetchedAt   DateTime?
-  createdAt   DateTime   @default(now())
+  id         String     @id @default(cuid())
+  eventId    String
+  source     SourceType
+  externalId String
+  url        String?
+  payload    Json?
+  fetchedAt  DateTime?
+  createdAt  DateTime   @default(now())
 
-  event       Event      @relation(fields: [eventId], references: [id])
+  event Event @relation(fields: [eventId], references: [id])
 
   @@unique([source, externalId])
   @@index([eventId])
@@ -326,67 +326,67 @@ model EventSource {
 // ---------
 
 model Plan {
-  id          String    @id @default(cuid())
-  userId      String
-  cityId      String?
-  title       String
-  date        DateTime?
-  isShared    Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id        String    @id @default(cuid())
+  userId    String
+  cityId    String?
+  title     String
+  date      DateTime?
+  isShared  Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  user        User      @relation(fields: [userId], references: [id])
-  city        City?     @relation(fields: [cityId], references: [id])
-  items       PlanItem[]
+  user  User       @relation(fields: [userId], references: [id])
+  city  City?      @relation(fields: [cityId], references: [id])
+  items PlanItem[]
 }
 
 model PlanItem {
-  id          String   @id @default(cuid())
-  planId      String
+  id           String    @id @default(cuid())
+  planId       String
   // Reference either a place or an event occurrence
-  placeId     String?
+  placeId      String?
   occurrenceId String?
-  orderIndex  Int      @default(0)
-  notes       String?
-  startAt     DateTime?
-  endAt       DateTime?
+  orderIndex   Int       @default(0)
+  notes        String?
+  startAt      DateTime?
+  endAt        DateTime?
 
-  plan        Plan     @relation(fields: [planId], references: [id])
-  place       Place?   @relation(fields: [placeId], references: [id])
-  occurrence  EventOccurrence? @relation(fields: [occurrenceId], references: [id])
+  plan       Plan             @relation(fields: [planId], references: [id])
+  place      Place?           @relation(fields: [placeId], references: [id])
+  occurrence EventOccurrence? @relation(fields: [occurrenceId], references: [id])
 
   @@index([planId])
 }
 
 model Favorite {
-  id          String   @id @default(cuid())
-  userId      String
-  placeId     String?
-  eventId     String?
-  createdAt   DateTime @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  placeId   String?
+  eventId   String?
+  createdAt DateTime @default(now())
 
-  user        User     @relation(fields: [userId], references: [id])
-  place       Place?   @relation(fields: [placeId], references: [id])
-  event       Event?   @relation(fields: [eventId], references: [id])
+  user  User   @relation(fields: [userId], references: [id])
+  place Place? @relation(fields: [placeId], references: [id])
+  event Event? @relation(fields: [eventId], references: [id])
 
   @@unique([userId, placeId], map: "uniq_fav_place")
   @@unique([userId, eventId], map: "uniq_fav_event")
 }
 
 model Review {
-  id          String   @id @default(cuid())
-  userId      String
-  placeId     String?
-  eventId     String?
-  rating      Int
-  text        String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  status      ModerationStatus @default(PENDING)
+  id        String           @id @default(cuid())
+  userId    String
+  placeId   String?
+  eventId   String?
+  rating    Int
+  text      String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  status    ModerationStatus @default(PENDING)
 
-  user        User     @relation(fields: [userId], references: [id])
-  place       Place?   @relation(fields: [placeId], references: [id])
-  event       Event?   @relation(fields: [eventId], references: [id])
+  user        User              @relation(fields: [userId], references: [id])
+  place       Place?            @relation(fields: [placeId], references: [id])
+  event       Event?            @relation(fields: [eventId], references: [id])
   moderations ModerationEntry[]
 
   @@index([placeId])
@@ -398,60 +398,60 @@ model Review {
 // ---------
 
 model Partner {
-  id          String   @id @default(cuid())
-  name        String
+  id           String   @id @default(cuid())
+  name         String
   contactEmail String?
-  cityId      String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  cityId       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  city        City?    @relation(fields: [cityId], references: [id])
-  imports     ImportJob[]
+  city    City?       @relation(fields: [cityId], references: [id])
+  imports ImportJob[]
 }
 
 model ImportJob {
-  id          String     @id @default(cuid())
-  partnerId   String?
-  kind        ImportKind
-  source      SourceType?
-  url         String?
-  payload     Json?
-  startedAt   DateTime   @default(now())
-  finishedAt  DateTime?
-  status      String     @default("pending") // textual status + details in log
-  log         Json?
+  id         String      @id @default(cuid())
+  partnerId  String?
+  kind       ImportKind
+  source     SourceType?
+  url        String?
+  payload    Json?
+  startedAt  DateTime    @default(now())
+  finishedAt DateTime?
+  status     String      @default("pending") // textual status + details in log
+  log        Json?
 
-  partner     Partner?   @relation(fields: [partnerId], references: [id])
+  partner Partner? @relation(fields: [partnerId], references: [id])
 }
 
 /// Moderation entries for any content (place, event, review)
 model ModerationEntry {
-  id          String   @id @default(cuid())
-  status      ModerationStatus @default(PENDING)
-  reason      String?
-  notes       String?
-  placeId     String?
-  eventId     String?
-  reviewId    String?
-  createdAt   DateTime @default(now())
-  decidedAt   DateTime?
+  id        String           @id @default(cuid())
+  status    ModerationStatus @default(PENDING)
+  reason    String?
+  notes     String?
+  placeId   String?
+  eventId   String?
+  reviewId  String?
+  createdAt DateTime         @default(now())
+  decidedAt DateTime?
 
-  place       Place?   @relation(fields: [placeId], references: [id])
-  event       Event?   @relation(fields: [eventId], references: [id])
-  review      Review?  @relation(fields: [reviewId], references: [id])
+  place  Place?  @relation(fields: [placeId], references: [id])
+  event  Event?  @relation(fields: [eventId], references: [id])
+  review Review? @relation(fields: [reviewId], references: [id])
 }
 
 /// Aggregated recommendation signals stored for experimentation
 model RecommendationSignal {
-  id          String   @id @default(cuid())
-  placeId     String?
-  eventId     String?
-  signals     Json     // arbitrary features: popularity, freshness, distance buckets, etc.
-  score       Float?   // precomputed score
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  placeId   String?
+  eventId   String?
+  signals   Json // arbitrary features: popularity, freshness, distance buckets, etc.
+  score     Float? // precomputed score
+  updatedAt DateTime @updatedAt
 
-  place       Place?   @relation(fields: [placeId], references: [id])
-  event       Event?   @relation(fields: [eventId], references: [id])
+  place Place? @relation(fields: [placeId], references: [id])
+  event Event? @relation(fields: [eventId], references: [id])
 
   @@unique([placeId], map: "uniq_signal_place")
   @@unique([eventId], map: "uniq_signal_event")
