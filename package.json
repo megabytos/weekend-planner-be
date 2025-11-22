@@ -28,10 +28,10 @@
     "jsonwebtoken": "^9.0.2",
     "pino": "^10.1.0",
     "prisma": "^5.22.0",
-    "zod": "^4.0.0"
+    "zod": "^4.0.0",
+    "@types/jsonwebtoken": "^9.0.10"
   },
   "devDependencies": {
-    "@types/jsonwebtoken": "^9.0.10",
     "pino-pretty": "^13.1.2",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3"

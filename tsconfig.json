@@ -10,7 +10,6 @@
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "types": ["node", "jsonwebtoken"],
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },
   "include": ["src/**/*.ts", "src/**/*.d.ts", "fastify.d.ts"],
