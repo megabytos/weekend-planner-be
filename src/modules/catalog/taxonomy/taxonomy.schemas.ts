@@ -14,6 +14,10 @@ export const taxonomyCategoriesQuerySchema = z.object({
 });
 
 export const taxonomyCategoriesResponseSchema = z.object({
+    queryId: z.string(),
+    total: z.number().int().nonnegative(),
+    tookMs: z.number().int().nonnegative().optional(),
+    warnings: z.array(z.string()).optional(),
     items: z.array(taxonomyCategorySchema)
 });
 

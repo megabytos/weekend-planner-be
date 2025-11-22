@@ -22,13 +22,22 @@ export const geoRoutes: FastifyPluginAsync = async (app) => {
             }
         },
         async (request) => {
+            const startedAt = Date.now();
             const query = geoCitiesQuerySchema.parse(request.query);
             const items = service.listCities({
                 q: query.q,
                 countryCode: query.countryCode
             });
 
-            return geoCitiesResponseSchema.parse({ items });
+            const tookMs = Date.now() - startedAt;
+            const response = {
+                queryId: `${startedAt}`,
+                total: items.length,
+                tookMs,
+                warnings: [] as string[],
+                items,
+            };
+            return geoCitiesResponseSchema.parse(response);
         }
     );
     app.get(

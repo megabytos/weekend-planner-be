@@ -21,11 +21,21 @@ export const taxonomyRoutes: FastifyPluginAsync = async (app) => {
             }
         },
         async (request) => {
+            const startedAt = Date.now();
             const query = taxonomyCategoriesQuerySchema.parse(request.query);
             const items = query.type
                 ? service.listCategories({ type: query.type })
                 : service.listCategories();
-            return taxonomyCategoriesResponseSchema.parse({ items });
+
+            const tookMs = Date.now() - startedAt;
+            const response = {
+                queryId: `${startedAt}`,
+                total: items.length,
+                tookMs,
+                warnings: [] as string[],
+                items,
+            };
+            return taxonomyCategoriesResponseSchema.parse(response);
         }
     );
 };
