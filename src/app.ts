@@ -10,7 +10,6 @@ import {
   serializerCompiler,
   validatorCompiler,
 } from 'fastify-type-provider-zod';
-import { z } from 'zod';
 
 import prismaPlugin from './plugins/prisma.js';
 import redisPlugin from './plugins/redis.js';
@@ -50,7 +49,7 @@ export async function createApp() {
         },
       },
       servers: [
-        { url: 'http://localhost:' + String(config.PORT), description: 'Local' },
+        { url: '/', description: 'Current host' },
       ],
       tags: [
         { name: 'system', description: 'Health and service info' },
