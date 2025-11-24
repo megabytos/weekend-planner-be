@@ -35,7 +35,9 @@ export async function createApp() {
   await app.register(cors, {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
-      if (allowedOrigins.has(origin)) return cb(null, true);
+      if (allowedOrigins.has(origin)) {
+        return cb(null, origin);
+      }
       cb(new Error('Origin not allowed by CORS'));
     },
     credentials: true,
