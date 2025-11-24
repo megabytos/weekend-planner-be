@@ -9,8 +9,7 @@ export default async function searchRoutes(app: FastifyInstance) {
     '/',
     {
       schema: {
-        description:
-          'Unified search for places and events. Events: Ticketmaster & PredictHQ; Places: Geoapify, Google Places, Foursquare (when API keys are configured).',
+        description: 'Unified search for places and events. Supports multiple data sources and filtering options.',
         tags: ['search'],
         body: searchRequestSchema,
         response: { 200: searchResponseSchema },

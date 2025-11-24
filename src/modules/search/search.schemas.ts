@@ -37,7 +37,7 @@ export type WhereInput = z.infer<typeof whereSchema>;
 
 export const whenPresetEnum = z.enum(['now', 'today_evening', 'tonight', 'tomorrow', 'this_weekend']);
 export const whenPresetSchema = z.object({ type: z.literal('preset'), preset: whenPresetEnum });
-export const whenRangeSchema = z.object({ type: z.literal('range'), from: z.string().datetime(), to: z.string().datetime() });
+export const whenRangeSchema = z.object({ type: z.literal('range'), from: z.iso.datetime(), to: z.iso.datetime() });
 export const whenSchema = z.union([whenPresetSchema, whenRangeSchema]);
 export type WhenInput = z.infer<typeof whenSchema>;
 
@@ -155,8 +155,8 @@ export const placeHitSchema = searchHitBaseSchema.extend({
 
 export const eventOccurrenceSummarySchema = z.object({
   id: z.string(),
-  startsAt: z.string().datetime(),
-  endsAt: z.string().datetime().nullable().optional(),
+  startsAt: z.iso.datetime(),
+  endsAt: z.iso.datetime().nullable().optional(),
   timezone: z.string().optional(),
   weekday: z.number().int().min(0).max(6).optional(),
   location: coordinatesSchema.nullable(),
