@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify';
-import { z } from 'zod';
 import {
   LoginBodySchema,
   TokensResponseSchema,
@@ -9,14 +8,31 @@ import {
   ForgotPasswordResponseSchema,
   ResetPasswordBodySchema,
   ResetPasswordResponseSchema,
+  RegisterBodySchema,
   LogoutResponseSchema
 } from './auth.schemas.js';
-import { login, refresh, logout } from './auth.service.js';
+import { login, refresh, logout, register } from './auth.service.js';
 
 
 
 // Auth routes under /api/auth
 export default async function authRoutes(app: FastifyInstance) {
+  app.post(
+    '/register',
+    {
+      schema: {
+        description: 'Creates a new user account and returns tokens',
+        tags: ['auth'],
+        body: RegisterBodySchema,
+        response: { 200: TokensResponseSchema },
+      },
+    },
+    async (req) => {
+      const body = RegisterBodySchema.parse(req.body);
+      return register(app, body);
+    }
+  );
+
   app.post(
     '/login',
     {
@@ -51,22 +67,22 @@ export default async function authRoutes(app: FastifyInstance) {
     }
   );
 
-    app.post(
-        '/logout',
-        {
-            schema: {
-                description: 'Invalidates refresh token',
-                tags: ['auth'],
-                body: LogoutBodySchema,
-                response: { 200: LogoutResponseSchema },
-            },
-        },
-        async (req) => {
-            const body = LogoutBodySchema.parse(req.body);
-            const res = await logout(app, body.refreshToken);
-            return res;
-        }
-    );
+  app.post(
+    '/logout',
+    {
+      schema: {
+        description: 'Invalidates refresh token',
+        tags: ['auth'],
+        body: LogoutBodySchema,
+        response: { 200: LogoutResponseSchema },
+      },
+    },
+    async (req) => {
+      const body = LogoutBodySchema.parse(req.body);
+      const res = await logout(app, body.refreshToken);
+      return res;
+    }
+  );
 
   app.post(
     '/forgot-password',

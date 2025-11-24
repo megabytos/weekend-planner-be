@@ -38,6 +38,13 @@ enum CompanyType {
   COLLEAGUES
 }
 
+/// Roles for user accounts
+enum UserRole {
+  ADMIN
+  PARTNER
+  USER
+}
+
 /// Where is the item: indoor/outdoor or both
 enum VenueType {
   INDOOR
@@ -77,6 +84,8 @@ enum ImportKind {
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
+  passwordHash String
+  role      UserRole @default(USER)
   name      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

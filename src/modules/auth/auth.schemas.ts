@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import {FastifyInstance} from "fastify";
 
 // Common primitives
 export const ScopeSchema = z.union([z.string(), z.array(z.string())]).optional();
@@ -9,13 +8,21 @@ export const RoleEnum = z.enum(['ADMIN', 'PARTNER', 'USER']);
 export type Role = z.infer<typeof RoleEnum>;
 
 // Login
+const PasswordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters long')
+  .max(128, 'Password must be at most 128 characters long')
+  .refine((value) => /[A-Za-z]/.test(value), {
+    message: 'Password must contain at least one letter',
+  })
+  .refine((value) => /\d/.test(value), {
+    message: 'Password must contain at least one digit',
+  });
+
 export const LoginBodySchema = z.object({
   email: z.email(),
-  password: z.string().min(1),
+  password: PasswordSchema,
   scope: ScopeSchema,
-  // Temporary until real DB is wired: allow specifying role to get correct cabinet access
-  // In production, role must be taken from database/user record and ignored in input
-  role: RoleEnum.optional(),
 });
 
 export const LogoutResponseSchema = z.object({
@@ -29,6 +36,12 @@ export const TokensResponseSchema = z.object({
   refreshToken: z.string().optional(),
   scope: z.array(z.string()).optional(),
   role: RoleEnum,
+});
+
+export const RegisterBodySchema = z.object({
+  email: z.email(),
+  password: PasswordSchema,
+  name: z.string().trim().min(2).max(120).optional(),
 });
 
 // Refresh
@@ -59,3 +72,4 @@ export const ResetPasswordResponseSchema = z.object({ reset: z.boolean() });
 export type LoginBody = z.infer<typeof LoginBodySchema>;
 export type RefreshBody = z.infer<typeof RefreshBodySchema>;
 export type LogoutBody = z.infer<typeof LogoutBodySchema>;
+export type RegisterBody = z.infer<typeof RegisterBodySchema>;
