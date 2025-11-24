@@ -31,7 +31,15 @@ export async function createApp() {
   app.decorate('config', config);
 
 
-  await app.register(cors, { origin: true });
+  const allowedOrigins = new Set(['http://localhost:3000', 'http://127.0.0.1:3000', 'https://weekend-planner-fe.vercel.app']);
+  await app.register(cors, {
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.has(origin)) return cb(null, true);
+      cb(new Error('Origin not allowed by CORS'));
+    },
+    credentials: true,
+  });
   await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
   await app.register(fastifySwagger, {
     openapi: {
