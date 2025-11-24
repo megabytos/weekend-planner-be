@@ -31,23 +31,17 @@ export async function createApp() {
   app.decorate('config', config);
 
 
+  const allowedOrigins = new Set([
+    'http://localhost:3000',
+    'http://127.0.0.1:3000',
+    'https://weekend-planner-fe.vercel.app',
+  ]);
+  
   await app.register(cors, {
     origin: (origin, cb) => {
-      const allowedOrigins = [
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-        'https://weekend-planner-fe.vercel.app'
-      ];
-  
-      if (!origin) {
-        return cb(null, true);
-      }
-  
-      if (allowedOrigins.includes(origin)) {
-        return cb(null, true);
-      }
-  
-      cb(new Error('Origin not allowed by CORS'));
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.has(origin)) return cb(null, origin);
+      return cb(new Error('Origin not allowed by CORS'), false);
     },
     credentials: true,
   });
