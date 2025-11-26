@@ -223,6 +223,11 @@ export async function searchUnified(
   let totalEventsCount = 0;
   let totalPlacesCount = 0;
 
+  let sizeDivider = 5;
+  if(query.target === "both"){ sizeDivider = !hasGeo && !hasCityId ? 2 : 5;}
+  else if(query.target === "events"){ sizeDivider = !hasGeo && !hasCityId ? 1 : 2;}
+  else if(query.target === "places"){ sizeDivider = !hasGeo && !hasCityId ? 1 : 3;}
+
   if (shouldQueryEvents) {
     // Compute effective location parameters per mode
     let city: string | undefined = undefined;
@@ -263,7 +268,7 @@ export async function searchUnified(
     }
 
     const limit = query.pagination?.limit ?? 40;
-    const size = Math.max(1, Math.floor(limit / 5));
+    const size = Math.max(1, Math.floor(limit / sizeDivider));
     const page = query.pagination?.page ?? 1;
 
     // Map requested taxonomy categories (EVENT) to provider-specific filters
@@ -487,7 +492,7 @@ export async function searchUnified(
     }
 
     const limit = query.pagination?.limit ?? 40;
-    const size = Math.max(1, Math.floor(limit / 5));
+    const size = Math.max(1, Math.floor(limit / sizeDivider));
     const page = query.pagination?.page ?? 1; // not used by providers currently
 
     const placeCategorySlugs = query.filters?.categorySlugs as readonly string[] | undefined;
