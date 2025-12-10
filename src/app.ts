@@ -35,6 +35,7 @@ export async function createApp() {
     'http://localhost:3000',
     'http://127.0.0.1:3000',
     'https://weekend-planner-fe.vercel.app',
+    'https://weekend-planner-be.onrender.com',
   ]);
   
   await app.register(cors, {
