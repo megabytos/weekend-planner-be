@@ -112,7 +112,7 @@ function computeWeekday(iso?: string): number | undefined {
   return d.getDay(); // 0..6
 }
 
-function kmDistance(a?: { lat: number; lon: number } | null, b?: { lat: number; lon: number } | null): number | undefined {
+function haversineKm(a?: { lat: number; lon: number } | null, b?: { lat: number; lon: number } | null): number | undefined {
   if (!a || !b) return undefined;
   const R = 6371; // km
   const toRad = (x: number) => (x * Math.PI) / 180;
@@ -122,10 +122,12 @@ function kmDistance(a?: { lat: number; lon: number } | null, b?: { lat: number; 
   const lat2 = toRad(b.lat);
   const sinDLat = Math.sin(dLat / 2);
   const sinDLon = Math.sin(dLon / 2);
-  const aa = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLon * sinDLon;
-  const c = 2 * Math.atan2(Math.sqrt(aa), Math.sqrt(1 - aa));
+  const h = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLon * sinDLon;
+  const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
   return R * c;
 }
+
+
 
 function derivePriceTier(price?: { from?: number | null; to?: number | null }): 'FREE' | 'CHEAP' | 'MODERATE' | 'EXPENSIVE' | null | undefined {
   if (!price) return undefined;
@@ -143,6 +145,38 @@ function mapCategoryToTaxonomy(slugsOrNames: string[]): { slug: string; type: 'E
     (c) => lower.some((x) => c.slug === x || c.name.toLowerCase().includes(x) || x.includes(c.name.toLowerCase()))
   );
   return match ? { slug: match.slug, type: match.type, name: match.name } : null;
+}
+
+// Helpers for expected duration and time computations
+function randStepMinutes(min: number, max: number, step: number): number {
+  const steps = Math.floor((max - min) / step) + 1;
+  const idx = Math.floor(Math.random() * steps);
+  return min + idx * step;
+}
+
+function addMinutesISO(iso: string, minutes: number): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  d.setMinutes(d.getMinutes() + minutes);
+  return d.toISOString();
+}
+
+function resolveExpectedDurationForEvent(categorySlug?: string | null): number {
+  if (!categorySlug || categorySlug === 'event.other') {
+    return randStepMinutes(90, 180, 10);
+  }
+  const cat = TAXONOMY_CATEGORIES.find((c) => c.slug === categorySlug && c.type === 'EVENT');
+  if (!cat) return randStepMinutes(90, 180, 10);
+  return cat.expected_duration ?? randStepMinutes(90, 180, 10);
+}
+
+function resolveExpectedDurationForPlace(categorySlug?: string | null): number {
+  if (!categorySlug || categorySlug === 'place.other') {
+    return randStepMinutes(60, 120, 10);
+  }
+  const cat = TAXONOMY_CATEGORIES.find((c) => c.slug === categorySlug && c.type === 'PLACE');
+  if (!cat) return randStepMinutes(60, 120, 10);
+  return cat.expected_duration ?? randStepMinutes(60, 120, 10);
 }
 
 export async function searchUnified(
@@ -247,7 +281,7 @@ export async function searchUnified(
       const centerLat = (bbox.south + bbox.north) / 2;
       const centerLon = (bbox.west + bbox.east) / 2;
       // approximate radius as half of diagonal distance
-      const diagKm = kmDistance({ lat: bbox.south, lon: bbox.west }, { lat: bbox.north, lon: bbox.east }) || 10;
+      const diagKm = haversineKm({ lat: bbox.south, lon: bbox.west }, { lat: bbox.north, lon: bbox.east }) || 10;
       const halfDiagKm = Math.max(1, Math.min(100, Math.round(diagKm / 2)));
       lat = centerLat;
       lon = centerLon;
@@ -368,7 +402,7 @@ export async function searchUnified(
             keys.predicthqToken
           );
           if (warning) warnings.push(warning);
-          // Provider already returns unified normalized event structure
+          // Provider already returns a unified normalized event structure
           normalizedEvents.push(...(items as any));
         })()
       );
@@ -386,7 +420,7 @@ export async function searchUnified(
       const primaryCategory = ev.categoriesRaw
         ? mapCategoryToTaxonomy(ev.categoriesRaw.filter(Boolean) as string[])
         : null;
-      const distanceKm = userPoint && ev.location ? kmDistance(userPoint, ev.location) : undefined;
+      const distanceKm = userPoint && ev.location ? haversineKm(userPoint, ev.location) : undefined;
       const priceTier = derivePriceTier({ from: ev.priceFrom ?? undefined, to: ev.priceTo ?? undefined }) ?? null;
       const scores: any = {};
       if (ev.rank != null) scores.rank = ev.rank;
@@ -421,19 +455,31 @@ export async function searchUnified(
         scores,
         isOnline: ev.isOnline ?? undefined,
         nextOccurrence: next
-          ? {
-              id: `${ev.provider.toLowerCase()}:${ev.id}:0`,
-              startsAt: nextStartsAtISO || next!.start,
-              endsAt: safeISO(next?.end) || next?.end || null,
-              timezone: next?.timezone,
-              weekday: computeWeekday(nextStartsAtISO || next?.start),
-              location: ev.location ?? null,
-              place: ev.venueId ? { id: '00000000-0000-0000-0000-000000000000', name: ev.venueName || undefined } : null,
-            }
+          ? (() => {
+              const startsAt = nextStartsAtISO || next!.start;
+              const expected = resolveExpectedDurationForEvent(primaryCategory?.slug);
+              const endsAtExisting = safeISO(next?.end) || next?.end || null;
+              const endsAt = endsAtExisting || addMinutesISO(startsAt, expected);
+              return {
+                id: `${ev.provider.toLowerCase()}:${ev.id}:0`,
+                startsAt,
+                endsAt,
+                timezone: next?.timezone,
+                weekday: computeWeekday(startsAt),
+                location: ev.location ?? null,
+                place: ev.venueId ? { id: '00000000-0000-0000-0000-000000000000', name: ev.venueName || undefined } : null,
+              };
+            })()
           : null,
         occurrences: ev.occurrences?.map((o) => ({
           start: safeISO(o.start) || o.start,
-          end: safeISO(o.end) || o.end,
+          end: (() => {
+            const startISO = safeISO(o.start) || o.start;
+            const endISO = safeISO(o.end) || o.end;
+            if (endISO) return endISO;
+            const expected = resolveExpectedDurationForEvent(primaryCategory?.slug);
+            return addMinutesISO(startISO, expected);
+          })(),
           location: ev.location ? { lat: ev.location.lat, lon: ev.location.lon } : undefined,
           venueId: ev.venueId || undefined,
           timezone: o.timezone,
@@ -468,7 +514,7 @@ export async function searchUnified(
       // Also compute center+radius for providers that don't support rect
       const centerLat = (bbox.south + bbox.north) / 2;
       const centerLon = (bbox.west + bbox.east) / 2;
-      const diagKm = kmDistance({ lat: bbox.south, lon: bbox.west }, { lat: bbox.north, lon: bbox.east }) || 10;
+      const diagKm = haversineKm({ lat: bbox.south, lon: bbox.west }, { lat: bbox.north, lon: bbox.east }) || 10;
       const halfDiagKm = Math.max(1, Math.min(50, Math.round(diagKm / 2)));
       lat = centerLat;
       lon = centerLon;
@@ -557,9 +603,10 @@ export async function searchUnified(
     const userPoint = lat !== undefined && lon !== undefined ? { lat, lon } : null;
     const placeHits = normalizedPlaces.map<Hit>((p: any) => {
       const primaryCategory = p.categoriesRaw ? mapCategoryToTaxonomy(p.categoriesRaw.filter(Boolean) as string[]) : null;
-      const distanceKm = userPoint && p.location ? kmDistance(userPoint, p.location) : undefined;
+      const distanceKm = userPoint && p.location ? haversineKm(userPoint, p.location) : undefined;
       const scores: any = {};
       if (distanceKm != null) scores.distance = distanceKm;
+      const expectedDuration = resolveExpectedDurationForPlace(primaryCategory?.slug);
       return {
         type: 'place',
         id: `${String(p.provider).toLowerCase()}:${p.id}`,
@@ -578,6 +625,7 @@ export async function searchUnified(
         url: p.url,
         address: p.address,
         scores,
+        expectedDuration,
         categoryMeta: p.categoriesRaw ? { raw: p.categoriesRaw } : undefined,
       } as any;
     });
@@ -595,7 +643,7 @@ export async function searchUnified(
     const getRank = (h: any) => h.scores?.rank ?? Number.NaN;
     const getDistance = (h: any) => {
       if (!userPoint2 || !h.location) return Number.NaN;
-      return kmDistance(userPoint2, h.location) ?? Number.NaN;
+      return haversineKm(userPoint2, h.location) ?? Number.NaN;
     };
     switch (sort) {
       case 'start_time':

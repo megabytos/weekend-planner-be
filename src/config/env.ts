@@ -12,16 +12,14 @@ const EnvSchema = z.object({
   SWAGGER_VERSION: z.string().default('0.1.0'),
 
   // Database/Cache
-  DATABASE_URL: z.string().url().or(z.string().startsWith('postgresql://')).optional(),
-  REDIS_URL: z.string().url().optional(),
-
+  DATABASE_URL: z.url().or(z.string().startsWith('postgresql://')).optional(),
+  REDIS_URL: z.url().optional(),
   // External API keys/tokens
   TICKETMASTER_API_KEY: z.string().optional(),
   PREDICTHQ_TOKEN: z.string().optional(),
   GEOAPIFY_API_KEY: z.string().optional(),
   GOOGLE_PLACES_API_KEY: z.string().optional(),
   FOURSQUARE_API_KEY: z.string().optional(),
-
   // Auth/JWT
   JWT_SECRET: z.string().min(16).default('dev-secret-change-me'),
   JWT_EXPIRES_IN: z.string().default('15m'), // e.g., '15m', '1h'

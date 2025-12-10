@@ -150,7 +150,8 @@ export const placeHitSchema = searchHitBaseSchema.extend({
   openingHours: openingHoursSchema.nullable().optional(),
   openNow: z.boolean().optional(),
   openUntil: z.string().optional(),
-    categoryMeta: z.record(z.string(), z.any()).optional(),
+  expectedDuration: z.number().int().positive(),
+  categoryMeta: z.record(z.string(), z.any()).optional(),
 });
 
 export const eventOccurrenceSummarySchema = z.object({

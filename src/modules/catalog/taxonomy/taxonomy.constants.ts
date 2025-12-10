@@ -6,6 +6,7 @@ export type TaxonomyCategory = {
     slug: string;        // e.g. "event.concert_show" or "place.food_restaurant"
     type: TaxonomyCategoryType;
     name: string;        // display name (en)
+    expected_duration: number;
 };
 
 // Import category lists (only type imports to avoid runtime cycles)

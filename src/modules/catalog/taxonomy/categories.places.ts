@@ -27,106 +27,133 @@ export const PLACE_CATEGORIES: TaxonomyCategory[] = [
     {
         slug: 'place.food_restaurant',
         type: 'PLACE',
-        name: 'Restaurants'
+        name: 'Restaurants',
+        expected_duration: 90
     },
     {
         slug: 'place.food_cafe_coffee',
         type: 'PLACE',
-        name: 'Cafes & Coffee'
+        name: 'Cafes & Coffee Shops',
+        expected_duration: 60
     },
     {
         slug: 'place.food_fast_street',
         type: 'PLACE',
-        name: 'Fast Food & Street Food'
+        name: 'Fast Food & Street Food',
+        expected_duration: 30
     },
     {
         slug: 'place.food_dessert_bakery',
         type: 'PLACE',
-        name: 'Desserts & Bakeries'
+        name: 'Dessert Places & Bakeries',
+        expected_duration: 40
     },
     {
         slug: 'place.bar_pub',
         type: 'PLACE',
-        name: 'Bars & Pubs'
+        name: 'Bars & Pubs',
+        expected_duration: 120
     },
     {
         slug: 'place.nightlife_club',
         type: 'PLACE',
-        name: 'Nightclubs'
+        name: 'Nightclubs',
+        expected_duration: 180
     },
     {
         slug: 'place.culture_museum_gallery',
         type: 'PLACE',
-        name: 'Museums & Galleries'
+        name: 'Museums & Art Galleries',
+        expected_duration: 120
     },
     {
         slug: 'place.culture_theatre_venue',
         type: 'PLACE',
-        name: 'Theatre & Concert Venues'
+        name: 'Theatres & Cultural Venues',
+        expected_duration: 60
     },
     {
         slug: 'place.culture_cinema',
         type: 'PLACE',
-        name: 'Cinemas'
+        name: 'Cinemas',
+        expected_duration: 60
     },
     {
         slug: 'place.family_zoo_aqua_theme',
         type: 'PLACE',
-        name: 'Zoos, Aquariums & Theme Parks'
+        name: 'Zoos, Aquaparks & Theme Parks',
+        expected_duration: 240
     },
     {
         slug: 'place.fun_bowling_arcade_escape',
         type: 'PLACE',
-        name: 'Bowling, Arcades & Escape Rooms'
+        name: 'Bowling, Arcades & Escape Rooms',
+        expected_duration: 90
     },
     {
         slug: 'place.outdoor_park_garden',
         type: 'PLACE',
-        name: 'Parks & Gardens'
+        name: 'Parks & Gardens',
+        expected_duration: 90
     },
     {
         slug: 'place.outdoor_nature_hiking',
         type: 'PLACE',
-        name: 'Nature & Hiking Areas'
+        name: 'Nature & Hiking Spots',
+        expected_duration: 240
     },
     {
         slug: 'place.outdoor_beach_waterfront',
         type: 'PLACE',
-        name: 'Beaches & Waterfronts'
+        name: 'Beaches & Waterfronts',
+        expected_duration: 180
     },
     {
         slug: 'place.sport_fitness_stadium',
         type: 'PLACE',
-        name: 'Sport & Fitness Venues'
+        name: 'Sports & Fitness Venues',
+        expected_duration: 90
     },
     {
         slug: 'place.spa_wellness_sauna',
         type: 'PLACE',
-        name: 'Spa & Wellness'
+        name: 'Spa & Wellness / Saunas',
+        expected_duration: 150
     },
     {
         slug: 'place.shopping_mall_department',
         type: 'PLACE',
-        name: 'Shopping Malls & Department Stores'
+        name: 'Shopping Malls & Department Stores',
+        expected_duration: 120
     },
     {
         slug: 'place.shopping_market_souvenir',
         type: 'PLACE',
-        name: 'Markets & Souvenir Shops'
+        name: 'Markets & Souvenir Shops',
+        expected_duration: 90
     },
     {
         slug: 'place.sight_landmark_historic',
         type: 'PLACE',
-        name: 'Landmarks & Historic Sites'
+        name: 'Landmarks & Historic Sites',
+        expected_duration: 60
     },
     {
         slug: 'place.sight_religion_worship',
         type: 'PLACE',
-        name: 'Religious Sites'
+        name: 'Religious Sites',
+        expected_duration: 40
     },
     {
         slug: 'place.kids_playground',
         type: 'PLACE',
-        name: 'Kids Playgrounds & Play Centers'
+        name: 'Kids Playgrounds & Play Centers',
+        expected_duration: 90
+    },
+    {
+        slug: 'place.other',
+        type: 'PLACE',
+        name: 'Other Places',
+        expected_duration: 90
     }
 ];
