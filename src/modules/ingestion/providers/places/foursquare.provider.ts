@@ -23,6 +23,22 @@ export type FoursquareNormalizedPlace = {
 
 const FSQ_BASE = 'https://places-api.foursquare.com/places/search';
 
+// Diagnostics: save raw first item
+import fs from 'node:fs';
+import path from 'node:path';
+const SAVE_RAW = process.env.INGEST_SAVE_PROVIDER_RAW_SAMPLES === 'true';
+function saveRawSample(provider: string, firstItem: unknown) {
+  if (!SAVE_RAW || !firstItem) return;
+  try {
+    const dir = path.join(process.cwd(), 'logs');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `rawResponse.${provider}.log`);
+    fs.writeFileSync(file, JSON.stringify(firstItem, null, 2) + '\n', 'utf8');
+  } catch {
+    // ignore diagnostics errors
+  }
+}
+
 export async function searchFoursquarePlaces(query: PlaceQuery, apiKey?: string): Promise<{ items: FoursquareNormalizedPlace[]; total?: number; warning?: string }> {
   if (!apiKey) return { items: [], warning: 'Foursquare API key is missing' };
 
@@ -45,11 +61,22 @@ export async function searchFoursquarePlaces(query: PlaceQuery, apiKey?: string)
     if (!res.ok) return { items: [], warning: `Foursquare HTTP ${res.status}` };
     const data: any = await res.json();
     const results: any[] = data?.results ?? [];
+    // Save raw first item for diagnostics
+    if (results.length) saveRawSample('FOURSQUARE', results[0]);
     const items: FoursquareNormalizedPlace[] = results.map((r: any) => {
-      const id = String(r.fsq_id);
+      // Foursquare may return different shapes depending on API/version or fields
+      // Prefer fsq_id, but fallback to fsq_place_id (observed in raw samples)
+      const rawId = r.fsq_id ?? r.fsq_place_id;
+      const id = String(rawId);
       const title = r.name || 'Place';
-      const loc = r.geocodes?.main ? { lat: Number(r.geocodes.main.latitude), lon: Number(r.geocodes.main.longitude) } : undefined;
-      const addr = r.location ? [r.location.address, r.location.locality, r.location.country].filter(Boolean).join(', ') : undefined;
+      // Coordinates can be either in geocodes.main or as top-level latitude/longitude
+      const lat = r.geocodes?.main?.latitude ?? r.latitude;
+      const lon = r.geocodes?.main?.longitude ?? r.longitude;
+      const loc = (lat != null && lon != null) ? { lat: Number(lat), lon: Number(lon) } : undefined;
+      // Address may come as structured fields or formatted string
+      const formatted = r.location?.formatted_address;
+      const composed = r.location ? [r.location.address, r.location.locality, r.location.country].filter(Boolean).join(', ') : undefined;
+      const addr = formatted || composed;
       const categoriesLite: FoursquareCategoryLite[] = Array.isArray(r.categories)
         ? r.categories.map((c: any) => ({ id: String(c.id), name: String(c.name), shortName: c.short_name ? String(c.short_name) : undefined }))
         : [];

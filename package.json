@@ -12,7 +12,11 @@
     "migrate:deploy": "prisma migrate deploy",
     "migrate:reset": "prisma migrate reset --force",
     "prisma:studio": "prisma studio",
-    "start:render": "npm run migrate:deploy && npm run start"
+    "start:render": "npm run migrate:deploy && npm run start && npm run seed:all",
+    "schema:push": "prisma db push",
+    "seed:taxonomy": "npm run schema:push && npm run prisma:generate && tsx scripts/seed-taxonomy.ts",
+    "seed:geo": "npm run schema:push && npm run prisma:generate && tsx scripts/seed-geo.ts",
+    "seed:all": "npm run schema:push && npm run prisma:generate && npm run seed:taxonomy && npm run seed:geo"
   },
   "dependencies": {
     "@fastify/cors": "^11.1.0",

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const SourceTypeEnum = z.enum(['TICKETMASTER', 'PREDICTHQ', 'GEOAPIFY', 'GOOGLE_PLACES', 'FOURSQUARE', 'MANUAL']);
+export const SourceTypeEnum = z.enum(['TICKETMASTER', 'PREDICTHQ', 'GEOAPIFY', 'GOOGLE_PLACES', 'FOURSQUARE', 'PARTNER', 'MANUAL']);
 export type SourceType = z.infer<typeof SourceTypeEnum>;
 
 export const BoundingBoxSchema = z
@@ -135,6 +135,8 @@ export const searchHitBaseSchema = z.object({
   imageUrl: z.string().url().nullable().optional(),
   photos: z.array(z.string().url()).optional(),
   sourceType: z.enum(['API', 'PARTNER', 'MANUAL', 'INTERNAL']),
+  // Raw provider enum stored on canonical entity (if present)
+  sourceProvider: SourceTypeEnum.optional(),
   sources: z.array(SourceRefSchema).optional(),
   url: z.string().url().optional(),
   scores: z.object({
@@ -161,7 +163,8 @@ export const eventOccurrenceSummarySchema = z.object({
   timezone: z.string().optional(),
   weekday: z.number().int().min(0).max(6).optional(),
   location: coordinatesSchema.nullable(),
-  place: z.object({ id: z.string().uuid(), name: z.string().optional() }).nullable(),
+  // Our IDs are cuid strings (not UUID v4), so accept any non-empty string
+  place: z.object({ id: z.string(), name: z.string().optional() }).nullable(),
 });
 
 export const eventHitSchema = searchHitBaseSchema.extend({

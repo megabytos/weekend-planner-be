@@ -46,6 +46,22 @@ export type NormalizedEvent = {
 
 const TM_BASE = 'https://app.ticketmaster.com/discovery/v2/events.json';
 
+// Diagnostics: save raw first item
+import fs from 'node:fs';
+import path from 'node:path';
+const SAVE_RAW = process.env.INGEST_SAVE_PROVIDER_RAW_SAMPLES === 'true';
+function saveRawSample(provider: string, firstItem: unknown) {
+  if (!SAVE_RAW || !firstItem) return;
+  try {
+    const dir = path.join(process.cwd(), 'logs');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `rawResponse.${provider}.log`);
+    fs.writeFileSync(file, JSON.stringify(firstItem, null, 2) + '\n', 'utf8');
+  } catch {
+    // ignore diagnostics errors
+  }
+}
+
 export async function searchTicketmaster(params: EventSearchParams, apiKey?: string): Promise<{ items: NormalizedEvent[]; total?: number; warning?: string }> {
     if (!apiKey) {
         return {items: [], warning: 'Ticketmaster API key is missing'};
@@ -79,6 +95,8 @@ export async function searchTicketmaster(params: EventSearchParams, apiKey?: str
         }
         const data: any = await res.json();
         const events: any[] = data?._embedded?.events ?? [];
+        // Save raw first item for diagnostics (unprocessed provider payload)
+        if (events.length) saveRawSample('TICKETMASTER', events[0]);
         const normalized: NormalizedEvent[] = events.map((ev: any) => {
             const imageUrl = (ev.images || []).find((img: any) => img.url)?.url;
             const venue = ev._embedded?.venues?.[0];

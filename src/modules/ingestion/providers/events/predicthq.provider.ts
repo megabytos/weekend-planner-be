@@ -46,6 +46,22 @@ export type NormalizedEvent = {
 
 const PHQ_BASE = 'https://api.predicthq.com/v1/events/';
 
+// Diagnostics: save raw first item
+import fs from 'node:fs';
+import path from 'node:path';
+const SAVE_RAW = process.env.INGEST_SAVE_PROVIDER_RAW_SAMPLES === 'true';
+function saveRawSample(provider: string, firstItem: unknown) {
+  if (!SAVE_RAW || !firstItem) return;
+  try {
+    const dir = path.join(process.cwd(), 'logs');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `rawResponse.${provider}.log`);
+    fs.writeFileSync(file, JSON.stringify(firstItem, null, 2) + '\n', 'utf8');
+  } catch {
+    // ignore diagnostics errors
+  }
+}
+
 export async function searchPredictHQ(params: EventSearchParams, token?: string): Promise<{ items: NormalizedEvent[]; total?: number; warning?: string }> {
   if (!token) {
     return { items: [], warning: 'PredictHQ token is missing' };
@@ -81,9 +97,29 @@ export async function searchPredictHQ(params: EventSearchParams, token?: string)
     }
     const data: any = await res.json();
     const events: any[] = data?.results ?? [];
+    // Save raw first item for diagnostics
+    if (events.length) saveRawSample('PREDICTHQ', events[0]);
     const normalized: NormalizedEvent[] = events.map((ev: any) => {
       const [lon, lat] = Array.isArray(ev.location) ? [ev.location[0], ev.location[1]] : [undefined, undefined];
-      const occurrence = ev.start ? [{ start: ev.start, end: ev.end, timezone: ev.timezone, url: ev.url }] : undefined;
+      // Build occurrence with proper end fallback:
+      // If duration === 0 and start === end (or end missing) but predicted_end exists → use predicted_end as end
+      let occ: { start: string; end?: string; timezone?: string; url?: string } | undefined;
+      if (ev.start) {
+        const startStr = String(ev.start);
+        let endStr: string | undefined = ev.end ? String(ev.end) : undefined;
+        const duration = typeof ev.duration === 'number' ? ev.duration : Number.isFinite(Number(ev.duration)) ? Number(ev.duration) : undefined;
+        const predictedEnd = ev.predicted_end ? String(ev.predicted_end) : undefined;
+        if ((!endStr || endStr === startStr) && (duration === 0 || duration === undefined) && predictedEnd) {
+          // Use predicted_end only if it is a valid ISO and after start
+          const sm = Date.parse(startStr);
+          const pm = Date.parse(predictedEnd);
+          if (!Number.isNaN(sm) && !Number.isNaN(pm) && pm > sm) {
+            endStr = predictedEnd;
+          }
+        }
+        occ = { start: startStr, end: endStr, timezone: ev.timezone, url: ev.url };
+      }
+      const occurrence = occ ? [occ] : undefined;
       const address = ev.entities?.[0]?.name || ev.venue?.name;
       // Try to extract city and countryCode from geo address if provided
       const geoAddr = ev.geo?.address || ev.address || ev.entities?.[0]?.address || ev.venue?.address;

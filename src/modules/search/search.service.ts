@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { PrismaClient } from '@prisma/client';
 import type { SearchRequest } from './search.schemas.js';
 import {
   searchResponseSchema,
@@ -9,6 +10,7 @@ import {
 import { searchTicketmaster } from '../ingestion/providers/events/ticketmaster.provider.js';
 import { searchPredictHQ } from '../ingestion/providers/events/predicthq.provider.js';
 import { TAXONOMY_CATEGORIES } from '../catalog/taxonomy/taxonomy.constants.js';
+import { resolveExpectedDurationForEvent, resolveExpectedDurationForPlace} from '../catalog/taxonomy/duration.js';
 import { searchGeoapify } from '../ingestion/providers/places/geoapify.provider.js';
 import { searchGooglePlaces } from '../ingestion/providers/places/google-places.provider.js';
 import { searchFoursquarePlaces } from '../ingestion/providers/places/foursquare.provider.js';
@@ -16,6 +18,9 @@ import { EVENT_TO_TICKETMASTER } from '../catalog/taxonomy/mapping.ticketmaster.
 import { EVENT_TO_PREDICTHQ } from '../catalog/taxonomy/mapping.predicthq.js';
 import type { SourceType } from './search.schemas.js';
 import { GeoService } from '../geo/geo.service.js';
+
+// Config: return only items that have photos (imageUrl)
+const SEARCH_ONLY_WITH_PHOTOS = process.env.SEARCH_ONLY_WITH_PHOTOS === 'true';
 
 export type ProviderKeys = {
   ticketmasterApiKey?: string;
@@ -30,18 +35,12 @@ function resolveTimeWindow(query: SearchRequest): { fromISO?: string; toISO?: st
   let fromISO: string | undefined;
   let toISO: string | undefined;
   if (!query.when) {
-    // default to this weekend
-    const d = new Date(now);
-    const day = d.getDay();
-    const daysUntilFriday = (5 - day + 7) % 7; // 5 = Friday
-    const friday = new Date(d);
-    friday.setDate(d.getDate() + daysUntilFriday);
-    friday.setHours(18, 0, 0, 0);
-    const sunday = new Date(friday);
-    sunday.setDate(friday.getDate() + 2);
-    sunday.setHours(23, 59, 59, 999);
-    fromISO = friday.toISOString();
-    toISO = sunday.toISOString();
+    // default to next 14 days from now
+    const start = new Date(now);
+    const end = new Date(now);
+    end.setDate(end.getDate() + 10);
+    fromISO = start.toISOString();
+    toISO = end.toISOString();
     return { fromISO, toISO };
   }
   if (query.when.type === 'range') {
@@ -147,36 +146,13 @@ function mapCategoryToTaxonomy(slugsOrNames: string[]): { slug: string; type: 'E
   return match ? { slug: match.slug, type: match.type, name: match.name } : null;
 }
 
-// Helpers for expected duration and time computations
-function randStepMinutes(min: number, max: number, step: number): number {
-  const steps = Math.floor((max - min) / step) + 1;
-  const idx = Math.floor(Math.random() * steps);
-  return min + idx * step;
-}
-
+// Helpers moved to shared taxonomy/duration to keep parity with ingest
+// (keep addMinutesISO inline if needed elsewhere)
 function addMinutesISO(iso: string, minutes: number): string {
   const d = new Date(iso);
   if (isNaN(d.getTime())) return iso;
   d.setMinutes(d.getMinutes() + minutes);
   return d.toISOString();
-}
-
-function resolveExpectedDurationForEvent(categorySlug?: string | null): number {
-  if (!categorySlug || categorySlug === 'event.other') {
-    return randStepMinutes(90, 180, 10);
-  }
-  const cat = TAXONOMY_CATEGORIES.find((c) => c.slug === categorySlug && c.type === 'EVENT');
-  if (!cat) return randStepMinutes(90, 180, 10);
-  return cat.expected_duration ?? randStepMinutes(90, 180, 10);
-}
-
-function resolveExpectedDurationForPlace(categorySlug?: string | null): number {
-  if (!categorySlug || categorySlug === 'place.other') {
-    return randStepMinutes(60, 120, 10);
-  }
-  const cat = TAXONOMY_CATEGORIES.find((c) => c.slug === categorySlug && c.type === 'PLACE');
-  if (!cat) return randStepMinutes(60, 120, 10);
-  return cat.expected_duration ?? randStepMinutes(60, 120, 10);
 }
 
 export async function searchUnified(
@@ -716,4 +692,394 @@ export async function searchUnified(
 
   // Validate against schema to guarantee shape
   return searchResponseSchema.parse(response);
+}
+
+// New: DB-backed search using ingested data
+export async function searchUnifiedFromDb(
+  query: SearchRequest,
+  prisma: PrismaClient
+): Promise<SearchResponse> {
+  const started = Date.now();
+  const warnings: string[] = [];
+
+  const { fromISO, toISO } = resolveTimeWindow(query);
+
+  const shouldQueryEvents = query.target === 'events' || query.target === 'both';
+  const shouldQueryPlaces = query.target === 'places' || query.target === 'both';
+
+  // Resolve location for distance
+  const hasGeo = !!query.where.geo && query.where.geo.lat != null && query.where.geo.lon != null;
+  const center = hasGeo ? { lat: query.where.geo!.lat, lon: query.where.geo!.lon } : undefined;
+
+  // Extract basic filters
+  const filterCategories = query.filters?.categorySlugs && query.filters.categorySlugs.length ? Array.from(new Set(query.filters.categorySlugs)) : undefined;
+  const filterSources = query.filters?.sources && query.filters.sources.length ? Array.from(new Set(query.filters.sources)) : undefined;
+  const filterPriceTier = query.budget?.tier && query.budget.tier !== 'ANY' ? query.budget.tier : undefined;
+  // Note: openNowOnly and other advanced filters are not applied yet in MVP
+
+  // Fetch candidates from DB
+  const dbCityId = query.where?.city?.id != null ? String(query.where.city.id) : undefined;
+  const candidatesPlaces = shouldQueryPlaces
+    ? await prisma.place.findMany({
+        where: {
+          isActive: true,
+          moderation: 'APPROVED' as any,
+          ...(dbCityId ? { cityId: dbCityId } : {}),
+          ...(SEARCH_ONLY_WITH_PHOTOS ? { imageUrl: { not: null } as any } : {}),
+          ...(filterPriceTier ? { priceTier: filterPriceTier as any } : {}),
+          ...(filterSources ? { sources: { some: { source: { in: filterSources as any } } } } : {}),
+          ...(filterCategories
+            ? {
+                OR: [
+                  { mainCategory: { is: { key: { in: filterCategories as any } } } as any },
+                  { categories: { some: { category: { key: { in: filterCategories as any } } } } },
+                ],
+              }
+            : {}),
+        },
+        select: {
+          id: true,
+          name: true,
+          description: true,
+          cityId: true,
+          city: { select: { id: true, name: true, countryCode: true, codeIATA: true } as any },
+          lat: true,
+          lng: true,
+          address: true,
+          url: true,
+          imageUrl: true,
+          mainCategory: { select: { id: true, key: true, title: true } as any },
+          popularityScore: true,
+          qualityScore: true,
+          freshnessScore: true,
+          reviewCount: true,
+          rating: true,
+          priceTier: true,
+          provider: true,
+          providerCategories: true,
+          openingHours: true,
+          sources: { select: { source: true, externalId: true, url: true } as any },
+          categories: { select: { category: { select: { key: true, title: true } as any } } },
+        },
+        take: 100,
+      })
+    : [];
+
+  const timeWhere: any = {};
+  if (fromISO) timeWhere.gte = new Date(fromISO);
+  if (toISO) timeWhere.lte = new Date(toISO);
+
+  const candidatesEvents = shouldQueryEvents
+    ? await prisma.event.findMany({
+        where: {
+          isActive: true,
+          moderation: 'APPROVED' as any,
+          occurrences: { some: { startTime: timeWhere } },
+          ...(dbCityId ? { cityId: dbCityId } : {}),
+          ...(SEARCH_ONLY_WITH_PHOTOS ? { imageUrl: { not: null } as any } : {}),
+          ...(filterPriceTier ? { priceTier: filterPriceTier as any } : {}),
+          ...(filterSources ? { sources: { some: { source: { in: filterSources as any } } } } : {}),
+          ...(filterCategories
+            ? {
+                OR: [
+                  { mainCategory: { is: { key: { in: filterCategories as any } } } as any },
+                  { categories: { some: { category: { key: { in: filterCategories as any } } } } },
+                ],
+              }
+            : {}),
+        },
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          imageUrl: true,
+          cityId: true,
+          city: { select: { id: true, name: true, countryCode: true, codeIATA: true } as any },
+          mainCategory: { select: { id: true, key: true, title: true } as any },
+          popularityScore: true,
+          qualityScore: true,
+          freshnessScore: true,
+          priceTier: true,
+          priceFrom: true,
+          priceTo: true,
+          currency: true,
+          isOnline: true,
+          ageLimit: true,
+          languages: true,
+          ticketsUrl: true,
+          provider: true,
+          providerCategories: true,
+          sources: { select: { source: true, externalId: true, url: true } as any },
+          categories: { select: { category: { select: { key: true, title: true } as any } } },
+          occurrences: {
+            where: { startTime: timeWhere },
+            orderBy: { startTime: 'asc' },
+            take: 1,
+            select: {
+              id: true,
+              startTime: true,
+              endTime: true,
+              timezone: true,
+              lat: true,
+              lng: true,
+              url: true,
+              place: { select: { id: true, name: true, lat: true, lng: true } as any },
+            },
+          },
+        },
+        take: 100,
+      })
+    : [];
+
+  // Ranking params
+  const composeRank = (pop?: number | null, qual?: number | null, fresh?: number | null, distanceKm?: number) => {
+    const popularity = pop ?? 0;
+    const quality = qual ?? 0;
+    const freshness = fresh ?? 0;
+    const base = 0.35 * popularity + 0.4 * quality + 0.25 * freshness;
+    const dist = distanceKm ?? (hasGeo ? 9999 : 0);
+    const distanceFactor = hasGeo ? Math.exp(-(dist) / 10) : 1; // penalty by ~10km scale
+    return base * distanceFactor;
+  };
+
+  // Map places to hits
+  type Hit = z.infer<typeof searchHitSchema>;
+  const placeHits: Hit[] = candidatesPlaces.map((p: any) => {
+    const loc = p.lat != null && p.lng != null ? { lat: Number(p.lat), lon: Number(p.lng) } : null;
+    const distanceKm = center && loc ? (haversineKm(center, loc) || undefined) : undefined;
+    const rank = composeRank(p.popularityScore, p.qualityScore, p.freshnessScore, distanceKm);
+    const primaryCatSlug = (p.mainCategory as any)?.key as string | undefined;
+    const expectedDuration = resolveExpectedDurationForPlace(primaryCatSlug ?? 'place.other');
+    // City object
+    const cityObj = p.city
+      ? {
+          id: p.city.id,
+          code: p.city.codeIATA ?? p.city.id,
+          name: p.city.name,
+          countryCode: p.city.countryCode,
+        }
+      : null;
+    // Categories array
+    const categoriesArr = Array.isArray(p.categories)
+      ? p.categories.map((c: any) => ({ slug: c.category.key as string, type: 'PLACE' as const, name: c.category.title as string | undefined }))
+      : [];
+    // Sources array
+    const sourcesArr = Array.isArray(p.sources)
+      ? p.sources.map((s: any) => ({ source: s.source, externalId: String(s.externalId), url: s.url ?? undefined }))
+      : undefined;
+    // Choose url: use first source url if present
+    const firstSourceUrl: string | undefined = Array.isArray(p.sources) && p.sources.length ? (p.sources[0]?.url ?? undefined) : undefined;
+    const placeUrl: string | undefined = p.url ?? undefined;
+    // categoryMeta.raw from providerCategories
+    const rawCats = typeof p.providerCategories === 'string' && p.providerCategories.length
+      ? p.providerCategories.split(',').map((s: string) => s.trim()).filter((s: string) => s.length)
+      : undefined;
+    const categoryMeta = rawCats && rawCats.length ? { raw: rawCats } : undefined;
+    const sourceType = mapSourceType(p.provider as SourceType | undefined);
+    return {
+      id: p.id,
+      type: 'place',
+      title: p.name || 'Place',
+      description: p.description ?? null,
+      city: cityObj,
+      primaryCategory: primaryCatSlug ? { slug: primaryCatSlug, type: 'PLACE', name: (p.mainCategory as any)?.title } : null,
+      categories: categoriesArr,
+      cardType: undefined,
+      address: p.address || undefined,
+      location: loc,
+      distanceKm,
+      indoorOutdoor: undefined,
+      priceTier: (p.priceTier as any) ?? null,
+      rating: p.rating ?? null,
+      reviewCount: p.reviewCount ?? null,
+      imageUrl: p.imageUrl ?? null,
+      photos: [],
+      sourceType,
+      sourceProvider: p.provider ?? undefined,
+      sources: sourcesArr,
+      url: placeUrl ?? firstSourceUrl ?? undefined,
+      scores: { rank, popularity: p.popularityScore ?? undefined, quality: p.qualityScore ?? undefined, distance: distanceKm },
+      openingHours: undefined,
+      openNow: undefined,
+      openUntil: undefined,
+      expectedDuration,
+      categoryMeta,
+    } as any as Hit;
+  });
+
+  // Helper: map provider to response-level sourceType (use function declaration to avoid TDZ issues)
+  function mapSourceType(p?: SourceType | null): 'API' | 'PARTNER' | 'MANUAL' | 'INTERNAL' {
+    if (!p) return 'API';
+    if (p === 'PARTNER') return 'PARTNER';
+    if (p === 'MANUAL') return 'MANUAL';
+    // External APIs → API
+    return 'API';
+  }
+
+  // Map events to hits
+  const eventHits: Hit[] = candidatesEvents.map((e: any) => {
+    const occ = Array.isArray(e.occurrences) && e.occurrences.length ? e.occurrences[0] : undefined;
+    const occLoc = occ
+      ? (occ.lat != null && occ.lng != null
+          ? { lat: Number(occ.lat), lon: Number(occ.lng) }
+          : (occ.place && occ.place.lat != null && occ.place.lng != null
+              ? { lat: Number(occ.place.lat), lon: Number(occ.place.lng) }
+              : null))
+      : null;
+    const distanceKm = center && occLoc ? (haversineKm(center, occLoc) || undefined) : undefined;
+    const rank = composeRank(e.popularityScore, e.qualityScore, e.freshnessScore, distanceKm);
+    const primaryCatSlug = (e.mainCategory as any)?.key as string | undefined;
+    // City object
+    const cityObj = e.city
+      ? {
+          id: e.city.id,
+          code: e.city.codeIATA ?? e.city.id,
+          name: e.city.name,
+          countryCode: e.city.countryCode,
+        }
+      : null;
+    // Categories array (excluding primary duplication is ok for now)
+    const categoriesArr = Array.isArray(e.categories)
+      ? e.categories
+          .map((c: any) => ({ slug: c.category.key as string, type: 'EVENT' as const, name: c.category.title as string | undefined }))
+      : [];
+    // Sources array
+    const sourcesArr = Array.isArray(e.sources)
+      ? e.sources.map((s: any) => ({ source: s.source, externalId: String(s.externalId), url: s.url ?? undefined }))
+      : undefined;
+    // Choose url/ticketsUrl: prefer occurrence.url, fallback to event.ticketsUrl, then first source url
+    const firstSourceUrl: string | undefined = Array.isArray(e.sources) && e.sources.length ? (e.sources[0]?.url ?? undefined) : undefined;
+    const url = occ?.url ?? e.ticketsUrl ?? firstSourceUrl;
+    const ticketsUrl = url ?? e.ticketsUrl ?? firstSourceUrl;
+    // categoryMeta.raw from providerCategories (comma-separated string)
+    const rawCats = typeof e.providerCategories === 'string' && e.providerCategories.length
+      ? e.providerCategories.split(',').map((s: string) => s.trim()).filter((s: string) => s.length)
+      : undefined;
+    const categoryMeta = rawCats && rawCats.length ? { raw: rawCats } : undefined;
+    const sourceType = mapSourceType(e.provider as SourceType | undefined);
+    const nextOccurrence = occ
+      ? {
+          id: occ.id,
+          startsAt: occ.startTime.toISOString(),
+          endsAt: occ.endTime ? occ.endTime.toISOString() : undefined,
+          timezone: occ.timezone ?? undefined,
+          weekday: computeWeekday(occ.startTime.toISOString()),
+          location: occLoc,
+          place: occ.place ? { id: occ.place.id, name: occ.place.name ?? undefined } : null,
+        }
+      : null;
+    return {
+      id: e.id,
+      type: 'event',
+      title: e.title || 'Event',
+      description: e.description ?? null,
+      city: cityObj,
+      primaryCategory: primaryCatSlug ? { slug: primaryCatSlug, type: 'EVENT', name: (e.mainCategory as any)?.title } : null,
+      categories: categoriesArr,
+      cardType: undefined,
+      address: undefined,
+      location: occLoc,
+      distanceKm,
+      indoorOutdoor: undefined,
+      priceTier: (e.priceTier as any) ?? null,
+      rating: undefined,
+      reviewCount: undefined,
+      imageUrl: e.imageUrl ?? null,
+      photos: [],
+      sourceType,
+      sourceProvider: e.provider ?? undefined,
+      sources: sourcesArr,
+      url: url ?? undefined,
+      scores: { rank, popularity: e.popularityScore ?? undefined, quality: e.qualityScore ?? undefined, distance: distanceKm },
+      isOnline: typeof e.isOnline === 'boolean' ? e.isOnline : undefined,
+      nextOccurrence,
+      occurrences: undefined,
+      priceFrom: e.priceFrom ?? null,
+      priceTo: e.priceTo ?? null,
+      currency: e.currency ?? undefined,
+      isFree: e.priceFrom === 0 ? true : undefined,
+      languages: Array.isArray(e.languages) && e.languages.length ? (e.languages as any) : undefined,
+      ageLimit: typeof e.ageLimit === 'number' ? e.ageLimit : undefined,
+      ticketsUrl: ticketsUrl ?? undefined,
+      categoryMeta,
+    } as any as Hit;
+  });
+
+  let hits: Hit[] = [];
+  if (query.target === 'events') hits = eventHits;
+  else if (query.target === 'places') hits = placeHits;
+  else hits = [...eventHits, ...placeHits];
+
+  // Sorting
+  const sortMode = query.sort ?? 'rank';
+  const priceWeight: Record<string, number> = { FREE: 1, CHEAP: 2, MODERATE: 3, EXPENSIVE: 4 };
+  if (sortMode === 'distance' && hasGeo) {
+    hits.sort((a: any, b: any) => (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity));
+  } else if (sortMode === 'start_time') {
+    // Events by nextOccurrence.startsAt asc; places fallback by rank
+    const timeOf = (h: any) => (h.type === 'event' && h.nextOccurrence?.startsAt ? Date.parse(h.nextOccurrence.startsAt) : Number.POSITIVE_INFINITY);
+    hits.sort((a: any, b: any) => {
+      const ta = timeOf(a);
+      const tb = timeOf(b);
+      if (ta !== tb) return ta - tb;
+      return (b.scores?.rank ?? 0) - (a.scores?.rank ?? 0);
+    });
+  } else if (sortMode === 'price_asc' || sortMode === 'price_desc') {
+    const dir = sortMode === 'price_asc' ? 1 : -1;
+    hits.sort((a: any, b: any) => {
+      const wa = a.priceTier ? priceWeight[a.priceTier] ?? Number.POSITIVE_INFINITY : Number.POSITIVE_INFINITY;
+      const wb = b.priceTier ? priceWeight[b.priceTier] ?? Number.POSITIVE_INFINITY : Number.POSITIVE_INFINITY;
+      if (wa !== wb) return dir * (wa - wb);
+      return (b.scores?.rank ?? 0) - (a.scores?.rank ?? 0);
+    });
+  } else if (sortMode === 'rating') {
+    hits.sort((a: any, b: any) => {
+      const ra = a.rating ?? -1;
+      const rb = b.rating ?? -1;
+      if (rb !== ra) return rb - ra;
+      const rca = a.reviewCount ?? 0;
+      const rcb = b.reviewCount ?? 0;
+      if (rcb !== rca) return rcb - rca;
+      return (b.scores?.rank ?? 0) - (a.scores?.rank ?? 0);
+    });
+  } else {
+    // rank
+    hits.sort((a: any, b: any) => (b.scores?.rank ?? 0) - (a.scores?.rank ?? 0));
+  }
+
+  const total = hits.length;
+  const offset = query.pagination?.offset ?? 0;
+  const limit = Math.min(100, query.pagination?.limit ?? 20);
+  const pageItems = hits.slice(offset, offset + limit);
+
+  // Facets from all hits (pre-paginated)
+  const categoryCounts = new Map<string, number>();
+  const priceCounts = new Map<string, number>();
+  for (const h of hits as any[]) {
+    const cat = h.primaryCategory?.slug;
+    if (cat) categoryCounts.set(cat, (categoryCounts.get(cat) ?? 0) + 1);
+    const pt = h.priceTier;
+    if (pt) priceCounts.set(pt, (priceCounts.get(pt) ?? 0) + 1);
+  }
+  const facets = {
+    categories: Array.from(categoryCounts.entries()).map(([key, count]) => ({ key, count })),
+    priceTier: Array.from(priceCounts.entries()).map(([key, count]) => ({ key, count })),
+  } as any;
+
+  const tookMs = Date.now() - started;
+  const resp: SearchResponse = {
+    queryId: `${Date.now()}`,
+    total,
+    pagination: { limit, offset, page: Math.floor(offset / limit) + 1 },
+    tookMs,
+    warnings: warnings.length ? warnings : undefined,
+    meta: {
+      target: query.target,
+      totalPlaces: placeHits.length,
+      totalEvents: eventHits.length,
+    },
+    facets,
+    items: pageItems as any,
+  } as any;
+  return resp;
 }

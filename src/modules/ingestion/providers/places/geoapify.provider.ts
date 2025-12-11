@@ -38,6 +38,22 @@ export type NormalizedPlace = {
 
 const GEOAPIFY_BASE = 'https://api.geoapify.com/v2/places';
 
+// Diagnostics: save raw first item
+import fs from 'node:fs';
+import path from 'node:path';
+const SAVE_RAW = process.env.INGEST_SAVE_PROVIDER_RAW_SAMPLES === 'true';
+function saveRawSample(provider: string, firstItem: unknown) {
+  if (!SAVE_RAW || !firstItem) return;
+  try {
+    const dir = path.join(process.cwd(), 'logs');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `rawResponse.${provider}.log`);
+    fs.writeFileSync(file, JSON.stringify(firstItem, null, 2) + '\n', 'utf8');
+  } catch {
+    // ignore diagnostics errors
+  }
+}
+
 export async function searchGeoapify(query: PlaceQuery, apiKey?: string): Promise<{ items: NormalizedPlace[]; total?: number; warning?: string }> {
   if (!apiKey) return { items: [], warning: 'Geoapify API key is missing' };
 
@@ -55,6 +71,10 @@ export async function searchGeoapify(query: PlaceQuery, apiKey?: string): Promis
   if (query.rect) {
     const { minLon, minLat, maxLon, maxLat } = query.rect;
     url.searchParams.set('filter', `rect:${minLon},${minLat},${maxLon},${maxLat}`);
+    // Add bias to improve relevance within rect (use center if provided)
+    const biasLon = query.lon != null ? query.lon : (minLon + maxLon) / 2;
+    const biasLat = query.lat != null ? query.lat : (minLat + maxLat) / 2;
+    url.searchParams.set('bias', `proximity:${biasLon},${biasLat}`);
   } else if (query.lat != null && query.lon != null) {
     const radiusM = Math.round((query.radiusKm ?? 5) * 1000);
     url.searchParams.set('filter', `circle:${query.lon},${query.lat},${radiusM}`);
@@ -66,7 +86,29 @@ export async function searchGeoapify(query: PlaceQuery, apiKey?: string): Promis
     const res = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
     if (!res.ok) return { items: [], warning: `Geoapify HTTP ${res.status}` };
     const data: any = await res.json();
-    const features: any[] = data?.features ?? [];
+    let features: any[] = data?.features ?? [];
+    // Save raw first item for diagnostics
+    if (features.length) saveRawSample('GEOAPIFY', features[0]);
+    // Fallback: if rect returned 0 features and we have a center + radius, retry once with circle
+    if ((!features || features.length === 0) && query.lat != null && query.lon != null) {
+      try {
+        const url2 = new URL(GEOAPIFY_BASE);
+        url2.searchParams.set('apiKey', apiKey);
+        url2.searchParams.set('limit', String(limit));
+        if (query.q) url2.searchParams.set('text', query.q);
+        const radiusM = Math.round((query.radiusKm ?? 5) * 1000);
+        url2.searchParams.set('filter', `circle:${query.lon},${query.lat},${radiusM}`);
+        url2.searchParams.set('bias', `proximity:${query.lon},${query.lat}`);
+        const res2 = await fetch(url2.toString(), { headers: { Accept: 'application/json' } });
+        if (res2.ok) {
+          const data2: any = await res2.json();
+          features = data2?.features ?? [];
+          if (features.length) saveRawSample('GEOAPIFY', features[0]);
+        }
+      } catch {
+        // ignore fallback errors
+      }
+    }
     const items: NormalizedPlace[] = features.map((f: any) => {
       const p = f?.properties || {};
       const id = String(p.place_id ?? p.osm_id ?? `${p.lat},${p.lon}`);

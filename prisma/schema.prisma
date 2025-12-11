@@ -132,15 +132,22 @@ model GeoRegion {
 }
 
 model City {
-  id        String   @id @default(cuid())
-  name      String
-  country   String
-  regionId  String?
-  lat       Decimal  @db.Decimal(10, 7)
-  lng       Decimal  @db.Decimal(10, 7)
-  tz        String // IANA timezone
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  country     String
+  countryCode String?
+  codeIATA    String?
+  regionId    String?
+  lat         Decimal  @db.Decimal(10, 7)
+  lng         Decimal  @db.Decimal(10, 7)
+  // Optional city bounding box
+  minLat      Decimal? @db.Decimal(10, 7)
+  minLng      Decimal? @db.Decimal(10, 7)
+  maxLat      Decimal? @db.Decimal(10, 7)
+  maxLng      Decimal? @db.Decimal(10, 7)
+  tz          String // IANA timezone
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   region   GeoRegion? @relation(fields: [regionId], references: [id])
   places   Place[]
@@ -157,13 +164,14 @@ model City {
 // ---------
 
 model PlaceCategory {
-  id        String        @id @default(cuid())
-  key       String        @unique
-  title     String
-  parentId  String?
-  scope     CategoryScope @default(PLACE)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id               String        @id @default(cuid())
+  key              String        @unique
+  title            String
+  parentId         String?
+  scope            CategoryScope @default(PLACE)
+  expectedDuration Int?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
   parent     PlaceCategory?    @relation("PlaceCategoryToParent", fields: [parentId], references: [id])
   children   PlaceCategory[]   @relation("PlaceCategoryToParent")
@@ -172,13 +180,14 @@ model PlaceCategory {
 }
 
 model EventCategory {
-  id        String        @id @default(cuid())
-  key       String        @unique
-  title     String
-  parentId  String?
-  scope     CategoryScope @default(EVENT)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  id               String        @id @default(cuid())
+  key              String        @unique
+  title            String
+  parentId         String?
+  scope            CategoryScope @default(EVENT)
+  expectedDuration Int?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
   parent     EventCategory?    @relation("EventCategoryToParent", fields: [parentId], references: [id])
   children   EventCategory[]   @relation("EventCategoryToParent")
@@ -191,11 +200,15 @@ model Place {
   cityId                String
   name                  String
   description           String?
-  mainCategoryId        String?
+  provider              SourceType?   // The first (primary) provider that created this canonical record
+  mainCategoryId        String?    
+  providerCategories    String? // Comma-separated raw categories as returned by providers (for manual mapping audit)
   // Coordinates of the place. Decimal for accuracy
   lat                   Decimal                @db.Decimal(10, 7)
   lng                   Decimal                @db.Decimal(10, 7)
   address               String?
+  url                   String?
+  imageUrl              String?
   venueType             VenueType?
   priceTier             PriceTier?
   openingHours          Json? // normalized opening hours; if null -> assumed always open
@@ -231,9 +244,19 @@ model Event {
   cityId                String
   title                 String
   description           String?
+  provider              SourceType? // The first (primary) provider that created this canonical record
   mainCategoryId        String?
+  providerCategories    String? // Comma-separated raw categories as returned by providers (for manual mapping audit)
   venueType             VenueType?
   priceTier             PriceTier?
+  // Pricing and details (to improve parity with legacy search output)
+  priceFrom             Float?
+  priceTo               Float?
+  currency              String?
+  isOnline              Boolean?
+  ageLimit              Int?
+  languages             String[]
+  ticketsUrl            String?
   attributes            Json?
   imageUrl              String?
   rating                Float?
@@ -311,14 +334,16 @@ model EventToCategory {
 // ---------
 
 model PlaceSource {
-  id         String     @id @default(cuid())
-  placeId    String
-  source     SourceType
-  externalId String
-  url        String?
-  payload    Json? // raw/normalized snapshot
-  fetchedAt  DateTime?
-  createdAt  DateTime   @default(now())
+  id              String     @id @default(cuid())
+  placeId         String
+  source          SourceType
+  externalId      String
+  url             String?
+  payload         Json? // raw/normalized snapshot
+  checksum        String? // SHA-256 of normalized payload
+  fetchedAt       DateTime?
+  createdAt       DateTime   @default(now())
+  sourceUpdatedAt DateTime? // when was the data last updated at source
 
   place Place @relation(fields: [placeId], references: [id])
 
@@ -327,14 +352,16 @@ model PlaceSource {
 }
 
 model EventSource {
-  id         String     @id @default(cuid())
-  eventId    String
-  source     SourceType
-  externalId String
-  url        String?
-  payload    Json?
-  fetchedAt  DateTime?
-  createdAt  DateTime   @default(now())
+  id              String     @id @default(cuid())
+  eventId         String
+  source          SourceType
+  externalId      String
+  url             String?
+  payload         Json?
+  checksum        String? // SHA-256 of normalized payload
+  fetchedAt       DateTime?
+  createdAt       DateTime   @default(now())
+  sourceUpdatedAt DateTime? // when was the data last updated at source
 
   event Event @relation(fields: [eventId], references: [id])
 

@@ -76,7 +76,7 @@ export const PLACE_CATEGORIES: TaxonomyCategory[] = [
         slug: 'place.culture_cinema',
         type: 'PLACE',
         name: 'Cinemas',
-        expected_duration: 60
+        expected_duration: 90
     },
     {
         slug: 'place.family_zoo_aqua_theme',

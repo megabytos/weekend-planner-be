@@ -22,6 +22,22 @@ export type GoogleNormalizedPlace = {
 const GP_BASE_NEARBY = 'https://maps.googleapis.com/maps/api/place/nearbysearch/json';
 const GP_BASE_TEXT = 'https://maps.googleapis.com/maps/api/place/textsearch/json';
 
+// Diagnostics: save raw first item
+import fs from 'node:fs';
+import path from 'node:path';
+const SAVE_RAW = process.env.INGEST_SAVE_PROVIDER_RAW_SAMPLES === 'true';
+function saveRawSample(provider: string, firstItem: unknown) {
+  if (!SAVE_RAW || !firstItem) return;
+  try {
+    const dir = path.join(process.cwd(), 'logs');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `rawResponse.${provider}.log`);
+    fs.writeFileSync(file, JSON.stringify(firstItem, null, 2) + '\n', 'utf8');
+  } catch {
+    // ignore diagnostics errors
+  }
+}
+
 export async function searchGooglePlaces(query: PlaceQuery, apiKey?: string): Promise<{ items: GoogleNormalizedPlace[]; total?: number; warning?: string }> {
   if (!apiKey) return { items: [], warning: 'Google Places API key is missing' };
 
@@ -52,6 +68,8 @@ export async function searchGooglePlaces(query: PlaceQuery, apiKey?: string): Pr
     if (!res.ok) return { items: [], warning: `Google Places HTTP ${res.status}` };
     const data: any = await res.json();
     const results: any[] = data?.results ?? [];
+    // Save raw first item for diagnostics
+    if (results.length) saveRawSample('GOOGLE_PLACES', results[0]);
     const items: GoogleNormalizedPlace[] = results.slice(0, limit).map((r: any) => {
       const id = String(r.place_id);
       const title = r.name || 'Place';
