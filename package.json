@@ -12,7 +12,7 @@
     "migrate:deploy": "prisma migrate deploy",
     "migrate:reset": "prisma migrate reset --force",
     "prisma:studio": "prisma studio",
-    "start:render": "npm run migrate:deploy && npm run start && npm run seed:all",
+    "start:render": "npm run migrate:deploy && npm run start",
     "schema:push": "prisma db push",
     "seed:taxonomy": "npm run schema:push && npm run prisma:generate && tsx scripts/seed-taxonomy.ts",
     "seed:geo": "npm run schema:push && npm run prisma:generate && tsx scripts/seed-geo.ts",
