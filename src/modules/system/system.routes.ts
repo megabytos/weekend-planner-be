@@ -48,8 +48,8 @@ export default async function systemRoutes(app: FastifyInstance) {
         async (req, reply) => {
             const q = req.query as { clear_ingest?: string };
             if (q.clear_ingest !== '1') {
-                reply.code(400);
-                return { ok: false, details: { deleted: { eventOccurrences: 0, placeSources: 0, eventSources: 0, placeToCategory: 0, eventToCategory: 0, places: 0, events: 0 } } } as any;
+                // Keep 200 response to satisfy route schema typing; indicate no-op
+                return { ok: false, details: { deleted: { eventOccurrences: 0, placeSources: 0, eventSources: 0, placeToCategory: 0, eventToCategory: 0, places: 0, events: 0 } } } as const;
             }
 
             // External providers we consider "ingest-managed"
