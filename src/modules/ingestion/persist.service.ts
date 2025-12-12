@@ -1,11 +1,17 @@
 import type { PrismaClient } from "@prisma/client";
 import type { SourceType } from "../search/search.schemas.js";
-import { IngestionDedupService, type NormalizedEventLike, type NormalizedPlaceLike } from "./dedup.service.js";
-import { IngestionMergeService, computeChecksum } from "./merge.service.js";
+// Import types only to avoid creating local value bindings that trigger TS2459
+import type { IngestionDedupService, NormalizedEventLike, NormalizedPlaceLike } from "./dedup.service.js";
+import { computeChecksum } from "./merge.service.js";
+import type { IngestionMergeService } from "./merge.service.js";
 import { IngestionScoringService } from "./scoring.service.js";
 import { DEDUP_RADIUS_METERS_DEFAULT } from "../../config/providers.js";
 import { IngestLogger } from "./ingest.logger.js";
 import { resolveExpectedDurationForEvent as resolveEventDurationShared } from "../catalog/taxonomy/duration.js";
+
+// Re-export types used by tests to avoid deep imports
+export type { IngestionDedupService, NormalizedEventLike, NormalizedPlaceLike } from "./dedup.service.js";
+export type { IngestionMergeService } from "./merge.service.js";
 
 export type IngestStats = {
   total: number;
