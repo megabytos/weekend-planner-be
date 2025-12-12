@@ -21,3 +21,7 @@ export const CACHE_LOCK_TTL = num('CACHE_LOCK_TTL', 10);
 
 // Cache version (bump to invalidate all)
 export const CACHE_NAMESPACE_VERSION = process.env.CACHE_NS_VERSION || 'v1';
+
+// Whether to invalidate cache after online-ingest on the first page (search)
+// By default disabled to keep the very first heavy response cached for the whole TTL
+export const CACHE_INVALIDATE_AFTER_INGEST = process.env.CACHE_INVALIDATE_AFTER_INGEST === 'true';

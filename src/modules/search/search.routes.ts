@@ -7,7 +7,7 @@ import { buildEventProviders, buildPlaceProviders } from '../ingestion/provider.
 import { IngestLogger } from '../ingestion/ingest.logger.js';
 import { GeoService } from '../geo/geo.service.js';
 import { CacheService, normalizeArray, roundGeo } from '../cache/cache.service.js';
-import { CACHE_ENABLED, CACHE_TTL_SEARCH_FIRST, CACHE_TTL_SEARCH_PAGES, CACHE_SWR_SEARCH } from '../../config/cache.js';
+import { CACHE_ENABLED, CACHE_TTL_SEARCH_FIRST, CACHE_TTL_SEARCH_PAGES, CACHE_SWR_SEARCH, CACHE_INVALIDATE_AFTER_INGEST } from '../../config/cache.js';
 
 // Search routes under /api/search using Zod schemas and service layer
 export default async function searchRoutes(app: FastifyInstance) {
@@ -296,9 +296,12 @@ export default async function searchRoutes(app: FastifyInstance) {
           ].slice(0, 10);
 
           // Invalidate city cache after ingest (search + catalog) if cityId is known
-          const cityIdForInvalidation = baseQuery.cityId ?? (query.where?.city?.id != null ? String(query.where.city.id) : undefined);
-          if (cityIdForInvalidation && cache.isEnabled()) {
-            try { await cache.invalidateByCity(String(cityIdForInvalidation), ['search', 'catalog:places', 'catalog:events']); } catch {}
+          // Optional: invalidate per-city caches (disabled by default to keep first heavy response for full TTL)
+          if (CACHE_INVALIDATE_AFTER_INGEST) {
+            const cityIdForInvalidation = baseQuery.cityId ?? (query.where?.city?.id != null ? String(query.where.city.id) : undefined);
+            if (cityIdForInvalidation && cache.isEnabled()) {
+              try { await cache.invalidateByCity(String(cityIdForInvalidation), ['search', 'catalog:places', 'catalog:events']); } catch {}
+            }
           }
         }
       } catch (e) {
