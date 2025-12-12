@@ -32,6 +32,7 @@ export const geoCitiesResponseSchema = z.object({
     total: z.number().int().nonnegative(),
     tookMs: z.number().int().nonnegative().optional(),
     warnings: z.array(z.string()).optional(),
+    defaultCityId: z.number().int(),
     items: z.array(geoCitySchema)
 });
 

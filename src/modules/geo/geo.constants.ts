@@ -1,5 +1,7 @@
 import type { GeoCity } from './geo.types.js';
 
+export const DEFAULT_GEO_CITY_ID = 40; // London
+
 export const GEO_CITIES: GeoCity[] = [
     {
         id: 1,

@@ -2,6 +2,7 @@ import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { TAXONOMY_CATEGORIES } from '../catalog/taxonomy/taxonomy.constants.js';
 import { GEO_CITIES } from '../geo/geo.constants.js';
+import { CACHE_NAMESPACE_VERSION } from '../../config/cache.js';
 
 const PingResponseSchema = z.object({
     pong: z.string(),
@@ -206,5 +207,44 @@ export default async function systemRoutes(app: FastifyInstance) {
 
             return { ok: true, details: result } as const;
         },
+    );
+
+    // Endpoint to clear entire cache namespace (safe, only our keys)
+    // Usage: POST /api/system/cache/clear?clear_cache=1
+    const ClearCacheResponse = z.object({ ok: z.boolean(), deleted: z.number().optional(), message: z.string().optional() });
+    app.post(
+        '/cache/clear',
+        {
+            schema: {
+                description: 'Clears all Redis cache keys for current namespace (CACHE_NS_VERSION). Requires clear_cache=1.',
+                tags: ['system'],
+                querystring: z.object({ clear_cache: z.string().optional() }),
+                response: { 200: ClearCacheResponse },
+            },
+        },
+        async (req) => {
+            const q = req.query as { clear_cache?: string };
+            if (q.clear_cache !== '1') {
+                return { ok: false, message: 'Pass clear_cache=1 to confirm cache clearing' } as const;
+            }
+            const redis = (app as any).redis as import('ioredis').Redis | undefined;
+            if (!redis) {
+                return { ok: false, message: 'Redis is not configured' } as const;
+            }
+            const pattern = `${CACHE_NAMESPACE_VERSION}:*`;
+            let cursor = '0';
+            let totalDeleted = 0;
+            do {
+                const [next, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 5000);
+                cursor = next;
+                if (keys && keys.length) {
+                    // Also delete freshness markers for SWR (key:fresh) by generating their names
+                    const freshKeys = keys.map((k) => `${k}:fresh`);
+                    const delCount = await redis.del(...keys, ...freshKeys).catch(() => 0);
+                    totalDeleted += Number(delCount);
+                }
+            } while (cursor !== '0');
+            return { ok: true, deleted: totalDeleted } as const;
+        }
     );
 }

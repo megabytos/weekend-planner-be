@@ -1048,8 +1048,9 @@ export async function searchUnifiedFromDb(
   }
 
   const total = hits.length;
-  const offset = query.pagination?.offset ?? 0;
-  const limit = Math.min(100, query.pagination?.limit ?? 20);
+  const limit = Math.min(100, query.pagination?.limit ?? 100);
+  const page = Math.max(1, query.pagination?.page ?? 1);
+  const offset = (page - 1) * limit;
   const pageItems = hits.slice(offset, offset + limit);
 
   // Facets from all hits (pre-paginated)
@@ -1070,7 +1071,7 @@ export async function searchUnifiedFromDb(
   const resp: SearchResponse = {
     queryId: `${Date.now()}`,
     total,
-    pagination: { limit, offset, page: Math.floor(offset / limit) + 1 },
+    pagination: { limit, offset, page },
     tookMs,
     warnings: warnings.length ? warnings : undefined,
     meta: {

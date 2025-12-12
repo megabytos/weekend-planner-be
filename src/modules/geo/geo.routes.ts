@@ -6,6 +6,7 @@ import {
     geoCityParamsSchema,
     geoCitySchema
 } from './geo.schemas.js';
+import {DEFAULT_GEO_CITY_ID} from "./geo.constants";
 
 export const geoRoutes: FastifyPluginAsync = async (app) => {
     const service = new GeoService();
@@ -35,6 +36,7 @@ export const geoRoutes: FastifyPluginAsync = async (app) => {
                 total: items.length,
                 tookMs,
                 warnings: [] as string[],
+                defaultCityId: DEFAULT_GEO_CITY_ID,
                 items,
             };
             return geoCitiesResponseSchema.parse(response);
