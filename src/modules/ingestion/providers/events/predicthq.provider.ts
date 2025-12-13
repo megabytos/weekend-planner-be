@@ -49,6 +49,7 @@ const PHQ_BASE = 'https://api.predicthq.com/v1/events/';
 // Diagnostics: save raw first item
 import fs from 'node:fs';
 import path from 'node:path';
+import { IngestLogger } from '../../ingest.logger.js';
 const SAVE_RAW = process.env.INGEST_SAVE_PROVIDER_RAW_SAMPLES === 'true';
 function saveRawSample(provider: string, firstItem: unknown) {
   if (!SAVE_RAW || !firstItem) return;
@@ -61,6 +62,9 @@ function saveRawSample(provider: string, firstItem: unknown) {
     // ignore diagnostics errors
   }
 }
+
+// Shared logger instance for provider diagnostics
+const providersLogger = new IngestLogger();
 
 export async function searchPredictHQ(params: EventSearchParams, token?: string): Promise<{ items: NormalizedEvent[]; total?: number; warning?: string }> {
   if (!token) {
@@ -87,6 +91,15 @@ export async function searchPredictHQ(params: EventSearchParams, token?: string)
     const uniq = Array.from(new Set(params.categories.filter(Boolean)));
     if (uniq.length) url.searchParams.set('category', uniq.join(','));
   }
+
+  // Log outgoing provider request (no sensitive headers)
+  try {
+    const msg = `[provider][PREDICTHQ] request: ${url.toString()}`;
+    // eslint-disable-next-line no-console
+    console.log(msg);
+    providersLogger.log(msg);
+    providersLogger.flushToFile(false);
+  } catch {}
 
   try {
     const res = await fetch(url.toString(), {

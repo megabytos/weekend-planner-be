@@ -41,6 +41,7 @@ const GEOAPIFY_BASE = 'https://api.geoapify.com/v2/places';
 // Diagnostics: save raw first item
 import fs from 'node:fs';
 import path from 'node:path';
+import { IngestLogger } from '../../ingest.logger.js';
 const SAVE_RAW = process.env.INGEST_SAVE_PROVIDER_RAW_SAMPLES === 'true';
 function saveRawSample(provider: string, firstItem: unknown) {
   if (!SAVE_RAW || !firstItem) return;
@@ -53,6 +54,9 @@ function saveRawSample(provider: string, firstItem: unknown) {
     // ignore diagnostics errors
   }
 }
+
+// Shared logger instance for provider diagnostics
+const providersLogger = new IngestLogger();
 
 export async function searchGeoapify(query: PlaceQuery, apiKey?: string): Promise<{ items: NormalizedPlace[]; total?: number; warning?: string }> {
   if (!apiKey) return { items: [], warning: 'Geoapify API key is missing' };
@@ -82,6 +86,17 @@ export async function searchGeoapify(query: PlaceQuery, apiKey?: string): Promis
   }
   if (query.openNow) url.searchParams.set('open_now', 'true');
 
+  // Log outgoing provider request (mask apiKey)
+  try {
+    const urlForLog = new URL(url.toString());
+    urlForLog.searchParams.set('apiKey', '***');
+    const msg = `[provider][GEOAPIFY] request: ${urlForLog.toString()}`;
+    // eslint-disable-next-line no-console
+    console.log(msg);
+    providersLogger.log(msg);
+    providersLogger.flushToFile(false);
+  } catch {}
+
   try {
     const res = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
     if (!res.ok) return { items: [], warning: `Geoapify HTTP ${res.status}` };
@@ -99,6 +114,16 @@ export async function searchGeoapify(query: PlaceQuery, apiKey?: string): Promis
         const radiusM = Math.round((query.radiusKm ?? 5) * 1000);
         url2.searchParams.set('filter', `circle:${query.lon},${query.lat},${radiusM}`);
         url2.searchParams.set('bias', `proximity:${query.lon},${query.lat}`);
+        // Log fallback request too (mask apiKey)
+        try {
+          const url2ForLog = new URL(url2.toString());
+          url2ForLog.searchParams.set('apiKey', '***');
+          const msg2 = `[provider][GEOAPIFY] request(fallback): ${url2ForLog.toString()}`;
+          // eslint-disable-next-line no-console
+          console.log(msg2);
+          providersLogger.log(msg2);
+          providersLogger.flushToFile(false);
+        } catch {}
         const res2 = await fetch(url2.toString(), { headers: { Accept: 'application/json' } });
         if (res2.ok) {
           const data2: any = await res2.json();

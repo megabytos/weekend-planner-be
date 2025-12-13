@@ -26,6 +26,7 @@ const FSQ_BASE = 'https://places-api.foursquare.com/places/search';
 // Diagnostics: save raw first item
 import fs from 'node:fs';
 import path from 'node:path';
+import { IngestLogger } from '../../ingest.logger.js';
 const SAVE_RAW = process.env.INGEST_SAVE_PROVIDER_RAW_SAMPLES === 'true';
 function saveRawSample(provider: string, firstItem: unknown) {
   if (!SAVE_RAW || !firstItem) return;
@@ -38,6 +39,9 @@ function saveRawSample(provider: string, firstItem: unknown) {
     // ignore diagnostics errors
   }
 }
+
+// Shared logger instance for provider diagnostics
+const providersLogger = new IngestLogger();
 
 export async function searchFoursquarePlaces(query: PlaceQuery, apiKey?: string): Promise<{ items: FoursquareNormalizedPlace[]; total?: number; warning?: string }> {
   if (!apiKey) return { items: [], warning: 'Foursquare API key is missing' };
@@ -55,6 +59,15 @@ export async function searchFoursquarePlaces(query: PlaceQuery, apiKey?: string)
     url.searchParams.set('radius', String(radiusM));
   }
   if (query.q) url.searchParams.set('query', query.q);
+
+  // Log outgoing provider request (no sensitive headers)
+  try {
+    const msg = `[provider][FOURSQUARE] request: ${url.toString()}`;
+    // eslint-disable-next-line no-console
+    console.log(msg);
+    providersLogger.log(msg);
+    providersLogger.flushToFile(false);
+  } catch {}
 
   try {
     const res = await fetch(url.toString(), { headers: { Accept: 'application/json', Authorization: `Bearer ${apiKey}`, 'X-Places-Api-Version': '2025-06-17' } });

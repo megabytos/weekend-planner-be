@@ -25,6 +25,7 @@ const GP_BASE_TEXT = 'https://maps.googleapis.com/maps/api/place/textsearch/json
 // Diagnostics: save raw first item
 import fs from 'node:fs';
 import path from 'node:path';
+import { IngestLogger } from '../../ingest.logger.js';
 const SAVE_RAW = process.env.INGEST_SAVE_PROVIDER_RAW_SAMPLES === 'true';
 function saveRawSample(provider: string, firstItem: unknown) {
   if (!SAVE_RAW || !firstItem) return;
@@ -37,6 +38,9 @@ function saveRawSample(provider: string, firstItem: unknown) {
     // ignore diagnostics errors
   }
 }
+
+// Shared logger instance for provider diagnostics
+const providersLogger = new IngestLogger();
 
 export async function searchGooglePlaces(query: PlaceQuery, apiKey?: string): Promise<{ items: GoogleNormalizedPlace[]; total?: number; warning?: string }> {
   if (!apiKey) return { items: [], warning: 'Google Places API key is missing' };
@@ -62,6 +66,17 @@ export async function searchGooglePlaces(query: PlaceQuery, apiKey?: string): Pr
     // Choose up to one type to restrict; Google Nearby supports only one 'type' param.
     url.searchParams.set('type', types[0]);
   }
+
+  // Log outgoing provider request (mask key)
+  try {
+    const urlForLog = new URL(url.toString());
+    urlForLog.searchParams.set('key', '***');
+    const msg = `[provider][GOOGLE_PLACES] request: ${urlForLog.toString()}`;
+    // eslint-disable-next-line no-console
+    console.log(msg);
+    providersLogger.log(msg);
+    providersLogger.flushToFile(false);
+  } catch {}
 
   try {
     const res = await fetch(url.toString(), { headers: { Accept: 'application/json' } });

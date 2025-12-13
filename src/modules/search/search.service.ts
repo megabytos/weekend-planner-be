@@ -30,7 +30,7 @@ export type ProviderKeys = {
   foursquareApiKey?: string;
 };
 
-function resolveTimeWindow(query: SearchRequest): { fromISO?: string; toISO?: string } {
+export function resolveTimeWindow(query: SearchRequest): { fromISO?: string; toISO?: string } {
   const now = new Date();
   let fromISO: string | undefined;
   let toISO: string | undefined;
@@ -77,18 +77,39 @@ function resolveTimeWindow(query: SearchRequest): { fromISO?: string; toISO?: st
       break;
     }
     case 'this_weekend': {
-      // upcoming Friday 18:00 to Sunday 23:59
+      // Mon–Fri: upcoming Friday 18:00 → Sunday 23:59
+      // Sat/Sun: current Saturday 00:00 → this Sunday 23:59
       const d = new Date(now);
       const day = d.getDay(); // 0 Sun .. 6 Sat
-      const daysUntilFriday = (5 - day + 7) % 7; // 5 = Friday
-      const friday = new Date(d);
-      friday.setDate(d.getDate() + daysUntilFriday);
-      friday.setHours(18, 0, 0, 0);
-      const sunday = new Date(friday);
-      sunday.setDate(friday.getDate() + 2);
-      sunday.setHours(23, 59, 59, 999);
-      start.setTime(friday.getTime());
-      end.setTime(sunday.getTime());
+
+      if (day === 6 || day === 0) {
+        // Weekend case
+        const saturday = new Date(d);
+        if (day === 6) {
+          // today is Saturday – start today 00:00
+          saturday.setHours(0, 0, 0, 0);
+        } else {
+          // today is Sunday – start from yesterday (Saturday) 00:00
+          saturday.setDate(d.getDate() - 1);
+          saturday.setHours(0, 0, 0, 0);
+        }
+        const sunday = new Date(saturday);
+        sunday.setDate(saturday.getDate() + 1);
+        sunday.setHours(23, 59, 59, 999);
+        start.setTime(saturday.getTime());
+        end.setTime(sunday.getTime());
+      } else {
+        // Weekday case – next Friday evening to Sunday late night
+        const daysUntilFriday = (5 - day + 7) % 7; // 5 = Friday
+        const friday = new Date(d);
+        friday.setDate(d.getDate() + daysUntilFriday);
+        friday.setHours(18, 0, 0, 0);
+        const sunday = new Date(friday);
+        sunday.setDate(friday.getDate() + 2);
+        sunday.setHours(23, 59, 59, 999);
+        start.setTime(friday.getTime());
+        end.setTime(sunday.getTime());
+      }
       break;
     }
   }

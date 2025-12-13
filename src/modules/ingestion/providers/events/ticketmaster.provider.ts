@@ -49,6 +49,7 @@ const TM_BASE = 'https://app.ticketmaster.com/discovery/v2/events.json';
 // Diagnostics: save raw first item
 import fs from 'node:fs';
 import path from 'node:path';
+import { IngestLogger } from '../../ingest.logger.js';
 const SAVE_RAW = process.env.INGEST_SAVE_PROVIDER_RAW_SAMPLES === 'true';
 function saveRawSample(provider: string, firstItem: unknown) {
   if (!SAVE_RAW || !firstItem) return;
@@ -61,6 +62,9 @@ function saveRawSample(provider: string, firstItem: unknown) {
     // ignore diagnostics errors
   }
 }
+
+// Shared logger instance for provider diagnostics
+const providersLogger = new IngestLogger();
 
 export async function searchTicketmaster(params: EventSearchParams, apiKey?: string): Promise<{ items: NormalizedEvent[]; total?: number; warning?: string }> {
     if (!apiKey) {
@@ -87,6 +91,17 @@ export async function searchTicketmaster(params: EventSearchParams, apiKey?: str
         const uniq = Array.from(new Set(params.classificationNames.filter(Boolean))).slice(0, 10);
         if (uniq.length) url.searchParams.set('classificationName', uniq.join(','));
     }
+
+    // Log outgoing provider request (without sensitive apikey value)
+    try {
+        const urlForLog = new URL(url.toString());
+        urlForLog.searchParams.set('apikey', '***');
+        const msg = `[provider][TICKETMASTER] request: ${urlForLog.toString()}`;
+        // eslint-disable-next-line no-console
+        console.log(msg);
+        providersLogger.log(msg);
+        providersLogger.flushToFile(false);
+    } catch {}
 
     try {
         const res = await fetch(url.toString(), {headers: {Accept: 'application/json'}});

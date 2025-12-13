@@ -1,7 +1,7 @@
 import { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { searchRequestSchema, searchResponseSchema, type SearchRequest, type SourceType } from './search.schemas.js';
-import { searchUnifiedFromDb } from './search.service.js';
+import { searchUnifiedFromDb, resolveTimeWindow } from './search.service.js';
 import { runOnlineIngest, type BaseQuery } from '../ingestion/ingestion.service.js';
 import { buildEventProviders, buildPlaceProviders } from '../ingestion/provider.adapters.js';
 import { IngestLogger } from '../ingestion/ingest.logger.js';
@@ -89,14 +89,15 @@ export default async function searchRoutes(app: FastifyInstance) {
                         ? query.filters.sources
                         : (['TICKETMASTER', 'PREDICTHQ', 'GEOAPIFY', 'GOOGLE_PLACES', 'FOURSQUARE'] as SourceType[]))
                     );
+                    const tw = resolveTimeWindow(query as any);
                     const baseQuery: BaseQuery = {
                       q: query.q,
                       lat: query.where?.geo?.lat,
                       lon: query.where?.geo?.lon,
                       radiusKm: query.where?.geo?.radiusKm ?? 10,
                       cityId: query.where?.city?.id != null ? String(query.where.city.id) : undefined,
-                      fromISO: query.when?.type === 'range' ? query.when.from : undefined,
-                      toISO: query.when?.type === 'range' ? query.when.to : undefined,
+                      fromISO: tw.fromISO,
+                      toISO: tw.toISO,
                       size: undefined,
                     };
                     try {
@@ -176,15 +177,15 @@ export default async function searchRoutes(app: FastifyInstance) {
 
           // Build a minimal BaseQuery for providers
           // Build BaseQuery enriched from city when provided
+          const tw = resolveTimeWindow(query as any);
           const baseQuery: BaseQuery = {
             q: query.q,
             lat: query.where?.geo?.lat,
             lon: query.where?.geo?.lon,
             radiusKm: query.where?.geo?.radiusKm ?? 10,
             cityId: query.where?.city?.id != null ? String(query.where.city.id) : undefined,
-            // For MVP we skip complex time presets here; providers can still work without
-            fromISO: query.when?.type === 'range' ? query.when.from : undefined,
-            toISO: query.when?.type === 'range' ? query.when.to : undefined,
+            fromISO: tw.fromISO,
+            toISO: tw.toISO,
             size: undefined,
           };
 
