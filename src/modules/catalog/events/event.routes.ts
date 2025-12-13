@@ -60,7 +60,7 @@ export default async function eventRoutes(app: FastifyInstance) {
     }, async (req) => {
         const params = PopularParamsSchema.parse(req.params);
         const cache = new CacheService(app);
-        const key = cache.buildKey('catalog:events:popular', { cityId: params.cityId, days: 30, limit: 100, offset: 0 });
+        const key = cache.buildKey('catalog:events:popular', { cityId: params.cityId, days: 30, limit: 12, offset: 0 });
         if (cache.isEnabled()) {
             const cached = await cache.getJSON<any>(key);
             if (cached) return cached;
@@ -74,7 +74,7 @@ export default async function eventRoutes(app: FastifyInstance) {
             when: { type: 'range', from: now.toISOString(), to: to.toISOString() },
             target: 'events',
             sort: 'rank',
-            pagination: { limit: 100, offset: 0, page: 1 }
+            pagination: { limit: 12, offset: 0, page: 1 }
         };
         const resp = await searchUnifiedFromDb(query as any, app.prisma);
         if (cache.isEnabled()) {

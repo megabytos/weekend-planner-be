@@ -62,7 +62,7 @@ export default async function placeRoutes(app: FastifyInstance) {
     }, async (req) => {
         const params = PopularParamsSchema.parse(req.params);
         const cache = new CacheService(app);
-        const key = cache.buildKey('catalog:places:popular', { cityId: params.cityId, limit: 100, offset: 0 });
+        const key = cache.buildKey('catalog:places:popular', { cityId: params.cityId, limit: 12, offset: 0 });
         if (cache.isEnabled()) {
             const cached = await cache.getJSON<any>(key);
             if (cached) return cached;
@@ -72,7 +72,7 @@ export default async function placeRoutes(app: FastifyInstance) {
             where: { city: { id: params.cityId as any } },
             target: 'places',
             sort: 'rank',
-            pagination: { limit: 100, offset: 0, page: 1 }
+            pagination: { limit: 12, offset: 0, page: 1 }
         };
         const resp = await searchUnifiedFromDb(query as any, app.prisma);
         if (cache.isEnabled()) {
