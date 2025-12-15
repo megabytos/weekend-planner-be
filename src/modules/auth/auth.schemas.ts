@@ -47,15 +47,13 @@ export const RegisterBodySchema = z.object({
 // Refresh
 export const RefreshBodySchema = z.object({
   refreshToken: z
-    .string({ required_error: 'refreshToken is required' })
-    .min(1, 'refreshToken must be a non-empty string'),
+    .string().min(1, 'refreshToken must be a non-empty string'),
 });
 
 // Logout
 export const LogoutBodySchema = z.object({
   refreshToken: z
-    .string({ required_error: 'refreshToken is required' })
-    .min(1, 'refreshToken must be a non-empty string'),
+    .string().min(1, 'refreshToken must be a non-empty string'),
 });
 
 // Forgot password
